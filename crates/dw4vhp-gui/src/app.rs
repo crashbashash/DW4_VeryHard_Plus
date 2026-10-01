@@ -28,18 +28,22 @@ const STAT_NAMES: [&str; 12] = [
     "atk", "def", "wis", "spr", "spd", "fire", "ice", "thunder", "dark", "stun", "poison", "exp",
 ];
 
-const CAVEAT_FORCE_VERY_HARD: &str = "Force Very Hard has never been played. It is a new \
-     implementation (one instruction) that is semantically equivalent to the documented mod, but \
-     \"the game really does run Very Hard after this patch\" is unconfirmed here — there is no \
-     emulator in this environment.";
+const CAVEAT_FORCE_VERY_HARD: &str =
+    "Force Very Hard (used by the Extreme preset) has never been played. It is a single \
+     instruction — the same change the original mod makes — and tests confirm it rewrites exactly \
+     four bytes in the game's boot file and touches nothing else. What no test can show is the \
+     result: this project was built without an emulator, so \"the game really does start on Very \
+     Hard\" is an expectation, not something anyone has watched happen.";
 const CAVEAT_VERY_HARD_TIER2: &str =
-    "Very Hard → tier 2 is inferred, not measured. Normal → tier 0 \
-     and Hard → tier 1 were verified live on the valley bridge; the Very Hard leg follows from the \
-     3-tier × 3–4-variant block layout. So Extreme's effect size is documented as inferred.";
-const CAVEAT_MOD_OPEN_ITEMS: &str = "The mod's own open items carry over verbatim: every boss row \
-     except `e_mecha4` row 60 is unmeasured, ~16 variant models have no row of their own, the \
-     88-record `beNDMWStatusInfo` table is unexplored, and the 2-player graduation tripwire has not \
-     been triggered.";
+    "The Very Hard → tier 2 mapping is reasoned, not measured. Normal → tier 0 and Hard → tier 1 \
+     were confirmed live in-game, on the valley bridge. The table is laid out as 3 tiers with 3–4 \
+     variants each, and Very Hard's tier 2 slot follows from that layout — but it was never checked \
+     the same way, so the Extreme preset's effect size is documented as inferred.";
+const CAVEAT_MOD_OPEN_ITEMS: &str =
+    "The original mod's own untested items still apply here: every boss row is unmeasured except \
+     `e_mecha4` row 60; about 16 variant models have no row of their own; the 88-record \
+     `beNDMWStatusInfo` table has never been explored; and the two-player graduation tripwire has \
+     never been triggered.";
 
 /// The window's whole state between frames.
 pub struct App {
