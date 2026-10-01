@@ -24,9 +24,10 @@ re-run from it.
 | --- | --- |
 | **Very Hard Plus** (default) | Derived ×1.0 stat multipliers, yellow crown (RARITY 5), practice-stage buff on, force Very Hard off, serial unchanged. This is the shipped, byte-verified build. |
 | **Very Hard Plus — Extreme** | Identical to the default, plus **force Very Hard**: a one-instruction ELF patch that makes the game start on Very Hard difficulty. |
+| **Very Hard Plus — Brutal** | Identical to Extreme, plus **row collapse**: every enemy of a type is made identical to that type's strongest row. |
 | **Custom** (auto-selected on any edit) | Exposes every knob: one multiplier per stat, the crown rank (0–5), the exclusion toggles, the practice buff, force Very Hard, and the serial rewrite. |
 
-The default and Extreme presets are named, exact builds; editing any field
+The default, Extreme and Brutal presets are named, exact builds; editing any field
 switches the preset to **Custom**.
 
 ## How it works
@@ -64,6 +65,10 @@ stated as such in the app's About panel:
   unmeasured except `e_mecha4` row 60; about 16 variant models have no row of
   their own; the 88-record `beNDMWStatusInfo` table has never been explored;
   and the two-player graduation tripwire has never been triggered.
+- **The Brutal preset's grouping is inferred, not read from the disc.** It comes from a memory
+  snapshot taken while the game was running, because the disc does not record which rows belong
+  to which enemy type. Every enemy of a type is made identical to that type's strongest row,
+  EXP included. The preset has never been played.
 
 ## The attack ceiling
 

@@ -295,3 +295,19 @@ fn collapse_then_practice_buff_puts_the_lesson_rows_on_their_type_top() {
     assert_eq!(s.practice_rows, 6);
     assert_eq!(s.collapsed_rows, 524);
 }
+
+#[test]
+fn brutal_is_extreme_plus_the_collapse_and_round_trips() {
+    let plan = Preset::Brutal.plan();
+    assert!(plan.force_very_hard && plan.collapse_to_top && plan.practice_buff);
+    assert!(plan.exclude_destructibles && plan.exclude_tripwire);
+    assert_eq!(Preset::detect(&plan), Preset::Brutal);
+    assert_eq!(Preset::Brutal.label(), "Very Hard Plus — Brutal");
+
+    let edited = PatchPlan {
+        collapse_to_top: false,
+        ..plan
+    };
+    assert_eq!(Preset::detect(&edited), Preset::Extreme);
+    assert_eq!(Preset::detect(&PatchPlan::default()), Preset::VeryHardPlus);
+}

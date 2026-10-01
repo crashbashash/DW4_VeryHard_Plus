@@ -1,7 +1,9 @@
 // crates/dw4vhp-gui/tests/form.rs
 use dw4vhp_core::error::Error;
 use dw4vhp_core::plan::{PlanSummary, Preset};
-use dw4vhp_gui::form::{attack_pin_note, default_output_path, status_for, StatusKind, UiState};
+use dw4vhp_gui::form::{
+    attack_pin_note, collapse_note, default_output_path, status_for, StatusKind, UiState,
+};
 use std::path::{Path, PathBuf};
 
 #[test]
@@ -65,4 +67,26 @@ fn the_attack_note_is_absent_when_nothing_is_pinned() {
         ..Default::default()
     };
     assert!(attack_pin_note(&s).is_none());
+}
+
+#[test]
+fn the_collapse_note_counts_the_rows_and_says_what_they_carry() {
+    let s = PlanSummary {
+        collapsed_rows: 524,
+        ..Default::default()
+    };
+    assert_eq!(
+        collapse_note(&s).unwrap(),
+        "collapse: 524 rows now carry their type's strongest row — every enemy of a type is \
+         identical, EXP included"
+    );
+}
+
+#[test]
+fn the_collapse_note_is_absent_when_nothing_is_collapsed() {
+    let s = PlanSummary {
+        collapsed_rows: 0,
+        ..Default::default()
+    };
+    assert!(collapse_note(&s).is_none());
 }

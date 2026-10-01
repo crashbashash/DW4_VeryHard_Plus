@@ -118,3 +118,17 @@ pub fn attack_pin_note(summary: &PlanSummary) -> Option<String> {
         )
     })
 }
+
+/// The note about the row collapse, or `None` when the plan does not collapse.
+///
+/// The attack-pin note stays a scaling-time figure (spec §12.2), so this line
+/// is what tells a player that the delivered table is nearly uniform.
+pub fn collapse_note(summary: &PlanSummary) -> Option<String> {
+    (summary.collapsed_rows > 0).then(|| {
+        format!(
+            "collapse: {} rows now carry their type's strongest row — every enemy of a type is \
+             identical, EXP included",
+            summary.collapsed_rows
+        )
+    })
+}

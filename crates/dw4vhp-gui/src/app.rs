@@ -8,7 +8,8 @@
 //! attack-ceiling note.
 
 use crate::form::{
-    attack_pin_note, default_output_path, status_for, StatusKind, StatusLine, UiState,
+    attack_pin_note, collapse_note, default_output_path, status_for, StatusKind, StatusLine,
+    UiState,
 };
 use crate::worker::{spawn_patch, WorkerHandle, WorkerMsg};
 use dw4vhp_core::disc::{inspect, DiscReport};
@@ -44,6 +45,11 @@ const CAVEAT_MOD_OPEN_ITEMS: &str =
      `e_mecha4` row 60; about 16 variant models have no row of their own; the 88-record \
      `beNDMWStatusInfo` table has never been explored; and the two-player graduation tripwire has \
      never been triggered.";
+const CAVEAT_BRUTAL: &str =
+    "The Brutal preset's enemy grouping comes from a memory snapshot taken while the game was \
+     running, not from the disc — the disc does not record which rows belong to which enemy type. \
+     Every enemy of a type is therefore made identical to that type's strongest row. Nobody has \
+     played this preset: with no emulator here, the in-game result is unconfirmed.";
 
 /// The window's whole state between frames.
 pub struct App {
@@ -297,7 +303,12 @@ impl App {
         egui::ComboBox::from_label("Preset")
             .selected_text(preset.label())
             .show_ui(ui, |ui| {
-                for candidate in [Preset::VeryHardPlus, Preset::Extreme, Preset::Custom] {
+                for candidate in [
+                    Preset::VeryHardPlus,
+                    Preset::Extreme,
+                    Preset::Brutal,
+                    Preset::Custom,
+                ] {
                     ui.selectable_value(&mut preset, candidate, candidate.label());
                 }
             });
@@ -419,6 +430,9 @@ impl App {
             if let Some(note) = attack_pin_note(summary) {
                 ui.colored_label(egui::Color32::from_rgb(200, 140, 0), note);
             }
+            if let Some(note) = collapse_note(summary) {
+                ui.colored_label(egui::Color32::from_rgb(200, 140, 0), note);
+            }
         }
     }
 
@@ -533,5 +547,6 @@ fn about_panel(ui: &mut egui::Ui) {
             ui.label(CAVEAT_FORCE_VERY_HARD);
             ui.label(CAVEAT_VERY_HARD_TIER2);
             ui.label(CAVEAT_MOD_OPEN_ITEMS);
+            ui.label(CAVEAT_BRUTAL);
         });
 }

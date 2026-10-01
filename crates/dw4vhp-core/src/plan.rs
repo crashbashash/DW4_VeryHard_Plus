@@ -76,6 +76,7 @@ impl Default for PatchPlan {
 pub enum Preset {
     VeryHardPlus,
     Extreme,
+    Brutal,
     Custom,
 }
 
@@ -90,6 +91,11 @@ impl Preset {
                 force_very_hard: true,
                 ..PatchPlan::default()
             },
+            Preset::Brutal => PatchPlan {
+                collapse_to_top: true,
+                force_very_hard: true,
+                ..PatchPlan::default()
+            },
             Preset::VeryHardPlus | Preset::Custom => PatchPlan::default(),
         }
     }
@@ -100,6 +106,8 @@ impl Preset {
             Preset::VeryHardPlus
         } else if *p == Preset::Extreme.plan() {
             Preset::Extreme
+        } else if *p == Preset::Brutal.plan() {
+            Preset::Brutal
         } else {
             Preset::Custom
         }
@@ -110,6 +118,7 @@ impl Preset {
         match self {
             Preset::VeryHardPlus => "Very Hard Plus",
             Preset::Extreme => "Very Hard Plus — Extreme",
+            Preset::Brutal => "Very Hard Plus — Brutal",
             Preset::Custom => "Custom",
         }
     }
