@@ -6,6 +6,7 @@
 //! table. Its shape may change with any test; nothing outside tests should
 //! depend on it.
 
+use crate::iso9660::IsoFile;
 use crate::layout::Layout;
 use crate::table::EnemyTable;
 use std::path::PathBuf;
@@ -31,6 +32,39 @@ const MODDED_RARITY: u8 = 5;
 
 /// ISO9660 sector size, so a file's extent starts at `lba * SECTOR`.
 const SECTOR: u32 = 2048;
+
+/// Extent LBA of the fixture `SLUS_208.36` boot ELF: its payload starts at ISO
+/// offset 0x1000. That is what fixes the brief's `vaddr_to_iso_offset(0x100000)
+/// == Some(0x80 + 0x1000)`.
+const ELF_LBA: u32 = 2;
+
+/// Bytes reserved for that payload. Its `PT_LOAD` segment maps the difficulty
+/// instruction to ISO offset 0x272E5C, so the image must reach past 0x272E60.
+const ELF_SIZE: u32 = 0x27_2000;
+
+/// Offset of the fixture's program-header table inside the ELF header.
+const ELF_PHDR_OFFSET: u32 = 0x34;
+
+/// Size of one program header, so the table is `ELF_PHDR_OFFSET + 2 *` this.
+const ELF_PHDR_SIZE: u32 = 32;
+
+/// Program headers the fixture declares: the load segment plus one that is not
+/// `PT_LOAD`, so that `ElfInfo::read` has something to filter.
+const ELF_PHDR_COUNT: u16 = 2;
+
+/// `PT_LOAD`: the one segment kind the mapping uses.
+const PT_LOAD: u32 = 1;
+
+/// The fixture segment's offset inside the ELF.
+const SEGMENT_OFFSET: u32 = 0x80;
+
+/// The fixture segment's virtual address, with the segment starting at the
+/// ELF's first byte in the image.
+const SEGMENT_VADDR: u32 = 0x0010_0000;
+
+/// The fixture segment's in-file size. It must cover
+/// [`crate::elf::DIFFICULTY_VADDR`], which the brief's original 0x2000 did not.
+const SEGMENT_FILESZ: u32 = 0x30_0000;
 
 /// Sector holding the primary volume descriptor.
 const PVD_SECTOR: u32 = 16;
@@ -99,6 +133,45 @@ pub fn iso_with_files(files: &[(&str, u32, u32)]) -> Vec<u8> {
     let directory_offset = directory_offset as usize;
     iso[directory_offset..directory_offset + directory.len()].copy_from_slice(&directory);
     iso
+}
+
+/// The image of [`iso_with_files`] carrying a `SLUS_208.36` boot ELF: an ELF
+/// header, a `PT_LOAD` segment that maps the difficulty instruction's virtual
+/// address, and that instruction planted where the segment maps it.
+///
+/// The payload's extent overlaps the ISO9660 metadata the base image wrote, but
+/// only the header, the program headers and the one word are ever touched, so
+/// the directory stays intact.
+pub fn iso_with_elf() -> Vec<u8> {
+    let mut iso = iso_with_files(&[("SLUS_208.36;1", ELF_LBA, ELF_SIZE)]);
+    let elf_at = (ELF_LBA * SECTOR) as usize;
+
+    iso[elf_at..elf_at + 4].copy_from_slice(b"\x7fELF");
+    iso[elf_at + 0x1C..elf_at + 0x20].copy_from_slice(&ELF_PHDR_OFFSET.to_le_bytes());
+    iso[elf_at + 0x2A..elf_at + 0x2C].copy_from_slice(&(ELF_PHDR_SIZE as u16).to_le_bytes());
+    iso[elf_at + 0x2C..elf_at + 0x2E].copy_from_slice(&ELF_PHDR_COUNT.to_le_bytes());
+
+    let phdr = elf_at + ELF_PHDR_OFFSET as usize;
+    iso[phdr..phdr + 4].copy_from_slice(&PT_LOAD.to_le_bytes());
+    iso[phdr + 4..phdr + 8].copy_from_slice(&SEGMENT_OFFSET.to_le_bytes());
+    iso[phdr + 8..phdr + 12].copy_from_slice(&SEGMENT_VADDR.to_le_bytes());
+    iso[phdr + 16..phdr + 20].copy_from_slice(&SEGMENT_FILESZ.to_le_bytes());
+    // The second program header stays zeroed: not `PT_LOAD`, so it must be
+    // dropped rather than mapped.
+
+    // Where the segment maps `DIFFICULTY_VADDR`, the authored `daddu` is planted.
+    let instruction =
+        elf_at + SEGMENT_OFFSET as usize + (crate::elf::DIFFICULTY_VADDR - SEGMENT_VADDR) as usize;
+    iso[instruction..instruction + 4]
+        .copy_from_slice(&crate::elf::mips::daddu(16, 4, 0).to_le_bytes());
+    iso
+}
+
+/// The fixture boot ELF's directory record. The fixture always carries it, so a
+/// miss means the fixture itself is broken rather than a case to handle.
+pub fn boot_elf(iso: &[u8]) -> IsoFile {
+    crate::iso9660::find_file(iso, "SLUS_208.36")
+        .expect("the fixture image always carries SLUS_208.36")
 }
 
 /// One directory record: length, extended-attribute length 0, extent LBA and

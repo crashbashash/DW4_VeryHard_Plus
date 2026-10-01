@@ -1,4 +1,5 @@
 pub mod disc;
+pub mod elf;
 pub mod error;
 pub mod iso9660;
 pub mod layout;
