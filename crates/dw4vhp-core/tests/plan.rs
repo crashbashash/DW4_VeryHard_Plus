@@ -2,6 +2,7 @@ use dw4vhp_core::plan::{
     transform, PatchPlan, Preset, DESTRUCTIBLE_ROWS, PRACTICE_MAP, TRIPWIRE_ROWS,
 };
 use dw4vhp_core::ratio::RatioVector;
+use dw4vhp_core::rowgroup::{COLLAPSE_SKIP_ROWS, ROW_GROUPS};
 use dw4vhp_core::table::EnemyTable;
 
 fn blank() -> EnemyTable {
@@ -171,4 +172,126 @@ fn multipliers_scale_the_derived_factors() {
     assert_eq!(out.hp[0], 650); // 100 * 6.5
     assert_eq!(out.stat[0][0], 60); // 10 * 6.0
     assert_eq!(out.crit[0], 2); // 2 + 0
+}
+
+/// A table where every row is distinguishable, so a copy is visible.
+fn indexed() -> EnemyTable {
+    EnemyTable {
+        hp: (0..649).collect(),
+        stat: (0..649).map(|r| [r; 12]).collect(),
+        crit: vec![2; 649],
+        para: vec![2; 649],
+        rarity: vec![0; 649],
+    }
+}
+
+fn identity_ratio() -> RatioVector {
+    RatioVector {
+        hp: 1.0,
+        stat: [1.0; 12],
+        crit_delta: 0.0,
+        para_delta: 0.0,
+    }
+}
+
+#[test]
+fn collapse_copies_each_types_top_row_over_its_other_rows() {
+    let t = indexed();
+    let plan = PatchPlan {
+        collapse_to_top: true,
+        ..PatchPlan::default()
+    };
+    let (out, s) = transform(&t, &plan, &identity_ratio());
+
+    for group in ROW_GROUPS {
+        if group.rows.len() == 1 {
+            continue;
+        }
+        for &row in group.rows {
+            if row == group.top || COLLAPSE_SKIP_ROWS.contains(&row) {
+                continue;
+            }
+            assert_eq!(
+                out.hp[row], out.hp[group.top],
+                "{} row {row} HP",
+                group.model
+            );
+            assert_eq!(
+                out.stat[row], out.stat[group.top],
+                "{} row {row} stats",
+                group.model
+            );
+            assert_eq!(
+                out.rarity[row], out.rarity[group.top],
+                "{} row {row} rarity",
+                group.model
+            );
+        }
+    }
+    assert_eq!(s.collapsed_rows, 524);
+}
+
+#[test]
+fn collapse_is_off_by_default() {
+    let t = indexed();
+    // The practice buff is switched off too: it is a separate stage that
+    // rewrites rows 638-643, and this test isolates the collapse.
+    let plan = PatchPlan {
+        practice_buff: false,
+        ..PatchPlan::default()
+    };
+    let (out, s) = transform(&t, &plan, &identity_ratio());
+    assert_eq!(s.collapsed_rows, 0);
+    assert!(ROW_GROUPS
+        .iter()
+        .all(|g| g.rows.iter().all(|&r| out.hp[r] == t.hp[r])));
+}
+
+#[test]
+fn collapse_leaves_the_practice_rows_and_the_tripwire_alone() {
+    let t = indexed();
+    // The exclusions are switched off so this pins the collapse's own skip rule,
+    // not the scaling exclusions.
+    let plan = PatchPlan {
+        collapse_to_top: true,
+        practice_buff: false,
+        exclude_destructibles: false,
+        exclude_tripwire: false,
+        ..PatchPlan::default()
+    };
+    let (out, _) = transform(&t, &plan, &identity_ratio());
+
+    for row in 638..=645 {
+        assert_eq!(out.hp[row], t.hp[row], "row {row} must keep its own value");
+        assert_eq!(
+            out.stat[row], t.stat[row],
+            "row {row} must keep its own stats"
+        );
+    }
+    for row in 370..=378 {
+        assert_eq!(out.hp[row], t.hp[row], "destructible {row}");
+    }
+    assert_eq!(out.hp[644], 644); // the tripwire is authored, not collapsed onto 95
+}
+
+#[test]
+fn collapse_then_practice_buff_puts_the_lesson_rows_on_their_type_top() {
+    let t = indexed();
+    let plan = PatchPlan {
+        collapse_to_top: true,
+        practice_buff: true,
+        exclude_tripwire: true,
+        ..PatchPlan::default()
+    };
+    let (out, s) = transform(&t, &plan, &identity_ratio());
+
+    // The buff copies from rows 0/1/33/34/12/13 *after* the collapse, so the
+    // lesson rows end up carrying their type's top row — intended for a preset
+    // called Brutal, and pinned here so it stays a decision.
+    assert_eq!(out.hp[638], out.hp[393]);
+    assert_eq!(out.hp[640], out.hp[41]);
+    assert_eq!(out.hp[642], out.hp[637]);
+    assert_eq!(out.hp[644], 644); // still the authored tripwire row
+    assert_eq!(s.practice_rows, 6);
+    assert_eq!(s.collapsed_rows, 524);
 }

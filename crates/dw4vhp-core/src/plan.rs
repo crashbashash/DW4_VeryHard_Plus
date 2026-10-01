@@ -1,4 +1,5 @@
 use crate::ratio::RatioVector;
+use crate::rowgroup::{COLLAPSE_SKIP_ROWS, ROW_GROUPS};
 use crate::table::EnemyTable;
 
 /// Authored rows for the destructibles (`g_*` crates and barrels), left
@@ -44,6 +45,7 @@ pub struct PatchPlan {
     pub exclude_destructibles: bool,
     pub exclude_tripwire: bool,
     pub practice_buff: bool,
+    pub collapse_to_top: bool,
     pub force_very_hard: bool,
     pub serial: Option<String>,
 }
@@ -61,6 +63,7 @@ impl Default for PatchPlan {
             exclude_destructibles: true,
             exclude_tripwire: true,
             practice_buff: true,
+            collapse_to_top: false,
             force_very_hard: false,
             serial: None,
         }
@@ -125,6 +128,7 @@ pub struct PlanSummary {
     pub hp_capped: usize,
     pub crit_pinned: usize,
     pub practice_rows: usize,
+    pub collapsed_rows: usize,
     pub elf_step: bool,
     pub serial_step: bool,
 }
@@ -184,6 +188,32 @@ pub fn transform(
 
         // Every handled row gets the crown, including the 69 empty rows.
         out.rarity[r] = plan.crown_rank;
+    }
+
+    // Brutal: copy each type's strongest row over that type's other rows, so
+    // the variant a stage happens to pick stops mattering (spec §12.2). The
+    // cap counters above are deliberately not recounted: they measure the
+    // scaling step, and the collapse copies values that are already clamped.
+    if plan.collapse_to_top {
+        for group in ROW_GROUPS {
+            // Every `g_*` destructible is a group of one row, so the collapse
+            // cannot touch it; the guard keeps that true if the table changes.
+            if group.rows.len() == 1 {
+                continue;
+            }
+            let top = group.top;
+            for &row in group.rows {
+                if row == top || COLLAPSE_SKIP_ROWS.contains(&row) {
+                    continue;
+                }
+                out.hp[row] = out.hp[top];
+                out.stat[row] = out.stat[top];
+                out.crit[row] = out.crit[top];
+                out.para[row] = out.para[top];
+                out.rarity[row] = out.rarity[top];
+                summary.collapsed_rows += 1;
+            }
+        }
     }
 
     if plan.practice_buff {
