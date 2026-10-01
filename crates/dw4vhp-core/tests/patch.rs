@@ -45,31 +45,51 @@ fn patches_a_clean_disc_and_reports_the_work_it_did() {
 #[test]
 fn the_elf_step_changes_exactly_four_bytes_and_only_when_enabled() {
     let (dir, input, layout) = testkit::full_disc_tempfile();
-    let plan = PatchPlan {
+    let default_out = dir.path().join("default.iso");
+    run(&layout, &input, &default_out, &PatchPlan::default());
+    let extreme = PatchPlan {
         force_very_hard: true,
         ..Default::default()
     };
-    let out = dir.path().join("extreme.iso");
-    run(&layout, &input, &out, &plan);
+    let extreme_out = dir.path().join("extreme.iso");
+    run(&layout, &input, &extreme_out, &extreme);
+
     let elf = testkit::elf_region_offset(&input).unwrap();
-    assert_eq!(testkit::changed_offsets(&input, &out), vec![elf]);
+    // Both outputs carry the table rewrite, so it cancels and the only changed
+    // run between them is the ELF difficulty word.
     assert_eq!(
-        std::fs::read(&out).unwrap()[elf as usize..elf as usize + 4],
-        0x2410_0001u32.to_le_bytes()
+        testkit::changed_offsets(&default_out, &extreme_out),
+        vec![elf]
+    );
+    let replacement = 0x2410_0001u32.to_le_bytes();
+    assert_eq!(
+        std::fs::read(&extreme_out).unwrap()[elf as usize..elf as usize + 4],
+        replacement
+    );
+    assert_ne!(
+        std::fs::read(&default_out).unwrap()[elf as usize..elf as usize + 4],
+        replacement,
+        "the default output must not carry the Extreme difficulty word"
     );
 }
 
 #[test]
 fn the_serial_step_changes_only_the_two_intended_ranges() {
     let (dir, input, layout) = testkit::full_disc_tempfile();
-    let plan = PatchPlan {
+    let default_out = dir.path().join("default.iso");
+    run(&layout, &input, &default_out, &PatchPlan::default());
+    let serial_plan = PatchPlan {
         serial: Some("SLUS_000.00".into()),
         ..Default::default()
     };
-    let out = dir.path().join("serial.iso");
-    run(&layout, &input, &out, &plan);
+    let serial_out = dir.path().join("serial.iso");
+    run(&layout, &input, &serial_out, &serial_plan);
+
     let (a, b) = testkit::serial_offsets(&input).unwrap();
-    let offsets = testkit::changed_offsets(&input, &out);
+    // The two outputs differ by the serial step alone, so the table rewrite
+    // cancels and every changed run must be one of the two serial ranges.
+    let offsets = testkit::changed_offsets(&default_out, &serial_out);
+    assert!(!offsets.is_empty(), "the serial step changed nothing");
     assert!(
         offsets
             .iter()

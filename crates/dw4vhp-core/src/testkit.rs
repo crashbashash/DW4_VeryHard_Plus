@@ -356,36 +356,22 @@ pub fn changed_byte_count(a: &Path, b: &Path) -> usize {
     count
 }
 
-/// The start offset of every changed run attributable to the ELF or serial
-/// steps: the difficulty word, the boot ELF's directory-record name and the
-/// serial inside `SYSTEM.CNF`. Table rewrites are deliberately excluded, so a
-/// call against a patched and an unpatched disc reports only the identity /
-/// difficulty work.
+/// The start offset of every maximal run of differing bytes between `a` and
+/// `b`, in ascending order — one entry per run. A plain byte diff with no
+/// knowledge of the disc's structures, so a run caused by a table rewrite is
+/// reported just like one caused by the ELF or serial steps. Both files are
+/// walked in bounded chunks, so a 1.4 GB image is never read into memory. Both
+/// files must have the same length.
 pub fn changed_offsets(a: &Path, b: &Path) -> Vec<u64> {
-    let mut windows: Vec<(u64, u64)> = Vec::new();
-    if let Ok(offset) = elf_region_offset(a) {
-        windows.push((offset, 4));
-    }
-    if let Ok((name, serial)) = serial_offsets(a) {
-        windows.push((name, 13));
-        windows.push((serial, 11));
-    }
-
     let mut runs = Vec::new();
     let mut in_run = false;
     with_diff_chunks(a, b, |offset, x, y| {
         for i in 0..x.len() {
             if x[i] != y[i] {
                 if !in_run {
-                    let pos = offset + i as u64;
-                    if windows
-                        .iter()
-                        .any(|&(start, len)| pos >= start && pos < start + len)
-                    {
-                        runs.push(pos);
-                    }
-                    in_run = true;
+                    runs.push(offset + i as u64);
                 }
+                in_run = true;
             } else {
                 in_run = false;
             }
