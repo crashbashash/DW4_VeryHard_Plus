@@ -115,3 +115,44 @@ fn the_nine_destructibles_are_single_row_groups_at_370_to_378() {
 fn the_collapse_skip_set_is_the_practice_range() {
     assert_eq!(COLLAPSE_SKIP_ROWS, 638..=645);
 }
+
+/// The shipped disc is *already modded*, so `inspect` refuses it and the HP
+/// block is read directly. That table is scaled by ×13 and clamped, which keeps
+/// both facts checked here: a row is live iff its HP is non-zero, and the
+/// intended top row is still a group maximum (the HP cap can tie rows, so this
+/// asserts a maximum, not the unique maximum).
+#[test]
+fn the_groups_cover_exactly_the_live_rows_of_a_real_disc() {
+    let Some(path) = std::env::var_os("DW4_GOLDEN_SHIPPED_ISO").map(std::path::PathBuf::from)
+    else {
+        eprintln!("SKIP: DW4_GOLDEN_SHIPPED_ISO is not set");
+        return;
+    };
+    let file = std::fs::File::open(&path).unwrap();
+    let mmap = unsafe { memmap2::Mmap::map(&file).unwrap() };
+    let table =
+        dw4vhp_core::table::EnemyTable::read(&mmap[..], &dw4vhp_core::layout::Layout::retail())
+            .unwrap();
+
+    let mut covered = vec![false; table.len()];
+    for group in ROW_GROUPS {
+        for &row in group.rows {
+            covered[row] = true;
+        }
+    }
+    for (row, is_covered) in covered.iter().enumerate() {
+        assert_eq!(
+            *is_covered,
+            table.hp[row] > 0,
+            "row {row}: covered by a group vs live on the disc"
+        );
+    }
+    for group in ROW_GROUPS {
+        let max = group.rows.iter().map(|&r| table.hp[r]).max().unwrap();
+        assert_eq!(
+            table.hp[group.top], max,
+            "{}: top row {} is not a group maximum",
+            group.model, group.top
+        );
+    }
+}

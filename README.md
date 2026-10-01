@@ -131,6 +131,29 @@ options touch only their expected regions and leave the input untouched.
 When the three variables are unset, the test **skips cleanly** rather than
 failing, so a normal `cargo test --workspace` (and CI) is unaffected.
 
+## Row-group test
+
+The Brutal preset collapses every enemy of a type onto that type's strongest
+row, which needs a row→type grouping the disc does not carry — the `MODEL`
+column is runtime-only. The grouping is committed data
+(`crates/dw4vhp-core/src/rowgroup.rs`), and two tests can prove it is the right
+data:
+
+- `tests/rowgroup.rs` checks, against a real disc, that the groups cover exactly
+the live rows and that each group's top row is its maximum. It uses
+`DW4_GOLDEN_SHIPPED_ISO` (above), and skips without it.
+- `tests/rowgroup_snapshot.rs` re-derives the groups from the runtime table and
+asserts they equal the committed ones, given `DW4_ROWGROUP_SNAPSHOT`:
+
+```sh
+DW4_ROWGROUP_SNAPSHOT=/path/to/pink_ram.bin \
+cargo test -p dw4vhp-core --test rowgroup_snapshot
+```
+
+The snapshot is the RAM image the grouping came from, and the only artefact
+that carries the type identity at all. It is never committed, like the discs,
+and the test skips cleanly without it.
+
 ## Repository rules
 
 **No game data is committed to this repository, ever** — no ISO, no ELF, no
