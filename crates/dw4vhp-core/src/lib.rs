@@ -9,3 +9,4 @@ pub mod region;
 pub mod serial;
 pub mod table;
 pub mod testkit;
+pub mod writer;

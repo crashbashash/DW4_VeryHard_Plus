@@ -10,6 +10,8 @@ name = "dw4vhp_core"
 path = "src/lib.rs"
 
 [dependencies]
+fs4 = "1"
+md-5 = "0.10"
 memchr = "2.8.3"
 tempfile = "3.27.0"
 thiserror = "2"
