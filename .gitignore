@@ -4,3 +4,11 @@
 *.elf
 *.p2s
 *.ps2
+
+# Disc-derived data must never be committed, including the golden test's
+# recorded-region backup blob.
+*.bin
+
+# The patcher streams its copy to `<output>.part`, which is a full/partial ISO
+# copy and therefore game data too.
+*.part
