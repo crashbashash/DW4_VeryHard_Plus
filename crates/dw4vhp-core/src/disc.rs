@@ -1,7 +1,14 @@
 use crate::error::{Error, Result};
+use crate::iso9660::{self, IsoFile};
 use crate::layout::Layout;
 use crate::table::EnemyTable;
 use std::path::Path;
+
+/// The boot ELF's ISO9660 name, without its `;1` version suffix.
+const BOOT_ELF_NAME: &str = "SLUS_208.36";
+
+/// The boot configuration file's ISO9660 name, without its `;1` version suffix.
+const CNF_NAME: &str = "SYSTEM.CNF";
 
 /// Counts the non-overlapping occurrences of `needle` in `iso`.
 pub fn count_copies(iso: &[u8], needle: &[u8]) -> usize {
@@ -17,10 +24,16 @@ const BLOCK_NAMES: [&str; 3] = ["HPMAX", "stats", "chargen"];
 const ALREADY_MODDED_ROWS: usize = 100;
 
 /// What [`inspect`] found on a disc: its size, how many copies of each authored
-/// block it carries, how many rows already carry a crown, and the table itself.
+/// block it carries, how many rows already carry a crown, the table itself, and
+/// the two files the later steps need.
 ///
 /// A report only exists for a disc that passed every check, so `already_modded`
 /// is always `false` here; the field is kept because the GUI shows it.
+///
+/// `boot_elf` and `cnf` are looked up best-effort: an image with no volume
+/// descriptor, or one that simply carries neither file, reports `None` and still
+/// inspects `Ok`. The crown data patch needs no ELF, so the disc is only refused
+/// for a missing boot ELF when a plan actually forces Very Hard, at plan time.
 #[derive(PartialEq, Debug, Clone)]
 pub struct DiscReport {
     pub size: u64,
@@ -28,6 +41,8 @@ pub struct DiscReport {
     pub rarity_nonzero: usize,
     pub already_modded: bool,
     pub authored: EnemyTable,
+    pub boot_elf: Option<IsoFile>,
+    pub cnf: Option<IsoFile>,
 }
 
 /// Reads the disc at `path` and refuses it unless it is an unpatched copy of
@@ -77,5 +92,7 @@ pub fn inspect_bytes(iso: &[u8], layout: &Layout) -> Result<DiscReport> {
         rarity_nonzero,
         already_modded,
         authored,
+        boot_elf: iso9660::find_file(iso, BOOT_ELF_NAME).ok(),
+        cnf: iso9660::find_file(iso, CNF_NAME).ok(),
     })
 }

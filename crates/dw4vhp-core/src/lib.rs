@@ -1,5 +1,6 @@
 pub mod disc;
 pub mod error;
+pub mod iso9660;
 pub mod layout;
 pub mod plan;
 pub mod ratio;

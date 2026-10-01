@@ -22,6 +22,18 @@ pub enum Error {
     )]
     AlreadyModded { rarity_nonzero: usize },
 
+    #[error(
+        "the file {name} was not found in the disc image — this is not the supported Digimon \
+         World 4 (USA) SLUS_208.36 release, or the image is incomplete"
+    )]
+    FileNotFound { name: String },
+
+    #[error(
+        "a directory-record name must be rewritten at its existing length: got {found} bytes, \
+         expected {expected}"
+    )]
+    NameLengthMismatch { found: usize, expected: usize },
+
     #[error("SLUS_208.36 was not found in this disc image — use the NTSC-U release, SLUS_208.36")]
     ElfNotFound,
 
