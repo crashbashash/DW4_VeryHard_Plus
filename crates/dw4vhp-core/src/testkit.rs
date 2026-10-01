@@ -6,10 +6,16 @@
 //! table. Its shape may change with any test; nothing outside tests should
 //! depend on it.
 
+use crate::elf::{ElfInfo, DIFFICULTY_VADDR};
+use crate::error::{Error, Result};
 use crate::iso9660::IsoFile;
 use crate::layout::Layout;
+use crate::serial::{serial_regions, DEFAULT_SERIAL};
 use crate::table::EnemyTable;
-use std::path::PathBuf;
+use memmap2::Mmap;
+use std::fs::File;
+use std::io::Read;
+use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 /// Rows in every generated table. The transform's row indices (391, 644) are
@@ -94,6 +100,22 @@ pub fn clean_disc_tempfile() -> (TempDir, PathBuf, Layout) {
 /// patched disc has: [`crate::disc::inspect`] refuses it as already modded.
 pub fn modded_disc_tempfile() -> (TempDir, PathBuf, Layout) {
     disc_tempfile("modded.iso", MODDED_RARITY)
+}
+
+/// A complete, clean disc image for the patch end-to-end tests: the authored
+/// table at [`Layout::mini`] offsets with three copies, a PVD/root directory
+/// holding `SLUS_208.36;1` and `SYSTEM.CNF;1`, the boot ELF with its authored
+/// `daddu` planted at the image offset of [`crate::elf::DIFFICULTY_VADDR`], and
+/// a `BOOT2 = cdrom0:\SLUS_208.36;1` line. Each structure is written at its own
+/// place, so none of them collides.
+pub fn full_disc_tempfile() -> (TempDir, PathBuf, Layout) {
+    let layout = Layout::mini(ROWS, COPIES);
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("full.iso");
+    let mut iso = iso_with_elf_and_cnf("SLUS_208.36");
+    overlay_table(&mut iso, &layout, 0);
+    std::fs::write(&path, iso).unwrap();
+    (dir, path, layout)
 }
 
 /// An ISO9660 image with a primary volume descriptor and one root-directory
@@ -272,6 +294,25 @@ fn disc_bytes(layout: &Layout, rarity: u8) -> Vec<u8> {
     iso
 }
 
+/// Overlays the authored table's three blocks onto `iso` at `layout`'s offsets,
+/// `COPIES` times [`COPY_STRIDE`] apart. The caller guarantees the buffer is
+/// large enough, and that the table's place is free: only the blocks themselves
+/// are written, so everything in the gaps stays put.
+fn overlay_table(iso: &mut [u8], layout: &Layout, rarity: u8) {
+    let blocks = authored_table(rarity).blocks();
+    let starts = [
+        layout.hp_off as usize,
+        layout.stat_off as usize,
+        layout.byte_off as usize,
+    ];
+    for copy in 0..COPIES {
+        let shift = copy * COPY_STRIDE as usize;
+        for (block, &start) in blocks.iter().zip(starts.iter()) {
+            iso[start + shift..start + shift + block.len()].copy_from_slice(block);
+        }
+    }
+}
+
 /// A full 649-row table whose every row differs from its neighbours, so each
 /// block's bytes stay recognisable in the image, with `rarity` on every row.
 fn authored_table(rarity: u8) -> EnemyTable {
@@ -298,5 +339,109 @@ fn authored_table(rarity: u8) -> EnemyTable {
         crit,
         para,
         rarity: vec![rarity; ROWS],
+    }
+}
+
+/// Chunk size for the two-file diff helpers, so a 1.4 GB retail image is walked
+/// without being read into memory.
+const DIFF_CHUNK: usize = 4 * 1024 * 1024;
+
+/// The number of byte positions where `a` and `b` differ. Both files must have
+/// the same length.
+pub fn changed_byte_count(a: &Path, b: &Path) -> usize {
+    let mut count = 0usize;
+    with_diff_chunks(a, b, |_, x, y| {
+        count += x.iter().zip(y.iter()).filter(|(p, q)| p != q).count();
+    });
+    count
+}
+
+/// The start offset of every changed run attributable to the ELF or serial
+/// steps: the difficulty word, the boot ELF's directory-record name and the
+/// serial inside `SYSTEM.CNF`. Table rewrites are deliberately excluded, so a
+/// call against a patched and an unpatched disc reports only the identity /
+/// difficulty work.
+pub fn changed_offsets(a: &Path, b: &Path) -> Vec<u64> {
+    let mut windows: Vec<(u64, u64)> = Vec::new();
+    if let Ok(offset) = elf_region_offset(a) {
+        windows.push((offset, 4));
+    }
+    if let Ok((name, serial)) = serial_offsets(a) {
+        windows.push((name, 13));
+        windows.push((serial, 11));
+    }
+
+    let mut runs = Vec::new();
+    let mut in_run = false;
+    with_diff_chunks(a, b, |offset, x, y| {
+        for i in 0..x.len() {
+            if x[i] != y[i] {
+                if !in_run {
+                    let pos = offset + i as u64;
+                    if windows
+                        .iter()
+                        .any(|&(start, len)| pos >= start && pos < start + len)
+                    {
+                        runs.push(pos);
+                    }
+                    in_run = true;
+                }
+            } else {
+                in_run = false;
+            }
+        }
+    });
+    runs
+}
+
+/// The image offset of the difficulty word, located through the boot ELF's own
+/// program headers rather than hardcoded.
+pub fn elf_region_offset(path: &Path) -> Result<u64> {
+    let iso = map_read_only(path)?;
+    let boot = boot_elf(&iso[..]);
+    let elf = ElfInfo::read(&iso[..], &boot)?;
+    elf.vaddr_to_iso_offset(DIFFICULTY_VADDR)
+        .ok_or(Error::ElfNotFound)
+}
+
+/// The image offsets of the two serial rewrites: first the boot ELF's
+/// directory-record name, then the serial inside `SYSTEM.CNF`'s `BOOT2` line.
+pub fn serial_offsets(path: &Path) -> Result<(u64, u64)> {
+    let iso = map_read_only(path)?;
+    let boot = boot_elf(&iso[..]);
+    let regions = serial_regions(&iso[..], &boot, DEFAULT_SERIAL)?;
+    Ok((regions[0].offset, regions[1].offset))
+}
+
+/// Maps `path` read-only, so a fixture or a 1.4 GB retail image can be handed
+/// to the byte-slice locators without a full copy.
+fn map_read_only(path: &Path) -> Result<Mmap> {
+    let file = File::open(path)?;
+    // Safety: the mapping is read-only and the file is not modified while it is
+    // mapped.
+    Ok(unsafe { Mmap::map(&file)? })
+}
+
+/// Streams both files side by side in [`DIFF_CHUNK`]-sized pieces and calls `f`
+/// with each pair of equal-length slices and the slice's starting offset.
+fn with_diff_chunks(a: &Path, b: &Path, mut f: impl FnMut(u64, &[u8], &[u8])) {
+    let mut fa = File::open(a).unwrap();
+    let mut fb = File::open(b).unwrap();
+    let len_a = fa.metadata().unwrap().len();
+    let len_b = fb.metadata().unwrap().len();
+    assert_eq!(len_a, len_b, "compared files must have the same length");
+
+    let mut buf_a = vec![0u8; DIFF_CHUNK];
+    let mut buf_b = vec![0u8; DIFF_CHUNK];
+    let mut offset = 0u64;
+    loop {
+        let n_a = fa.read(&mut buf_a).unwrap();
+        let n_b = fb.read(&mut buf_b).unwrap();
+        assert_eq!(n_a, n_b, "compared files must have the same length");
+        if n_a == 0 {
+            break;
+        }
+        f(offset, &buf_a[..n_a], &buf_b[..n_a]);
+        offset += n_a as u64;
     }
 }
