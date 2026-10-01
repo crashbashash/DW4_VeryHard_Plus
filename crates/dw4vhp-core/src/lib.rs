@@ -6,5 +6,6 @@ pub mod layout;
 pub mod plan;
 pub mod ratio;
 pub mod region;
+pub mod serial;
 pub mod table;
 pub mod testkit;

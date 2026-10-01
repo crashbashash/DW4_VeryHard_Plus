@@ -42,6 +42,10 @@ const ELF_LBA: u32 = 2;
 /// instruction to ISO offset 0x272E5C, so the image must reach past 0x272E60.
 const ELF_SIZE: u32 = 0x27_2000;
 
+/// Extent LBA of the fixture `SYSTEM.CNF`: past the ELF's extent, in the
+/// image's zeroed remainder, so the two never overlap.
+const CNF_LBA: u32 = 0x1000;
+
 /// Offset of the fixture's program-header table inside the ELF header.
 const ELF_PHDR_OFFSET: u32 = 0x34;
 
@@ -167,6 +171,22 @@ pub fn iso_with_elf() -> Vec<u8> {
     iso
 }
 
+/// The image of [`iso_with_elf`] plus a `SYSTEM.CNF` whose payload carries the
+/// boot line `BOOT2 = cdrom0:\{serial};1`, so a test can exercise the two
+/// serial rewrites from one image.
+pub fn iso_with_elf_and_cnf(serial: &str) -> Vec<u8> {
+    let mut iso = iso_with_elf();
+    let payload = format!("BOOT2 = cdrom0:\\{serial};1\r\n");
+    let start = CNF_LBA as usize * SECTOR as usize;
+    let end = start + payload.len();
+    if iso.len() < end {
+        iso.resize(end, 0);
+    }
+    iso[start..end].copy_from_slice(payload.as_bytes());
+    push_directory_record(&mut iso, "SYSTEM.CNF;1", CNF_LBA, payload.len() as u32);
+    iso
+}
+
 /// The fixture boot ELF's directory record. The fixture always carries it, so a
 /// miss means the fixture itself is broken rather than a case to handle.
 pub fn boot_elf(iso: &[u8]) -> IsoFile {
@@ -191,6 +211,22 @@ fn directory_record(name: &[u8], lba: u32, size: u32) -> Vec<u8> {
     record[32] = name.len() as u8;
     record[33..unpadded].copy_from_slice(name);
     record
+}
+
+/// Appends a record to the fixture's root-directory sector, after the records
+/// the base image already wrote, leaving the rest of the sector zeroed.
+fn push_directory_record(iso: &mut [u8], name: &str, lba: u32, size: u32) {
+    let start = (ROOT_DIR_SECTOR * SECTOR) as usize;
+    let mut used = 0;
+    while used < SECTOR as usize && iso[start + used] != 0 {
+        used += iso[start + used] as usize;
+    }
+    let record = directory_record(name.as_bytes(), lba, size);
+    assert!(
+        used + record.len() <= SECTOR as usize,
+        "the fixture's root directory must fit in one sector"
+    );
+    iso[start + used..start + used + record.len()].copy_from_slice(&record);
 }
 
 /// Writes `value` into an 8-byte both-endian field: little-endian half first.
