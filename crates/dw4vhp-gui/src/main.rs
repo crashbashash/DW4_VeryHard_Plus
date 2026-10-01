@@ -1,12 +1,42 @@
 //! The `dw4-veryhard-plus` binary.
 //!
-//! The window itself arrives in Task 13, which replaces this placeholder with
-//! the `eframe` app. For now the binary only has to exist and link the same
-//! crate the tests exercise.
+//! Handles `--version` and `--help` itself — `eframe` provides no CLI — and
+//! then starts the window from [`dw4vhp_gui::app::App`].
 
-fn main() {
+use eframe::egui;
+
+fn main() -> eframe::Result {
+    for arg in std::env::args().skip(1) {
+        match arg.as_str() {
+            "--version" | "-V" => {
+                println!("dw4-veryhard-plus {}", env!("CARGO_PKG_VERSION"));
+                return Ok(());
+            }
+            "--help" | "-h" => {
+                print_help();
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
+
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default().with_inner_size([760.0, 720.0]),
+        ..Default::default()
+    };
+    eframe::run_native(
+        "dw4-veryhard-plus",
+        options,
+        Box::new(|_cc| Ok(Box::new(dw4vhp_gui::app::App::new()))),
+    )
+}
+
+fn print_help() {
     println!(
-        "dw4-veryhard-plus {} — the window is not implemented yet",
+        "dw4-veryhard-plus {} — patch a Digimon World 4 (USA) ISO to Very Hard Plus",
         env!("CARGO_PKG_VERSION")
     );
+    println!("Usage: dw4-veryhard-plus [OPTIONS]");
+    println!("  -V, --version  print the version and exit");
+    println!("  -h, --help     print this help and exit");
 }
