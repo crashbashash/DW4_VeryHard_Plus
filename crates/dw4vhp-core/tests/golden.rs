@@ -12,9 +12,12 @@
 //! has no discs. When they are set, the shipped disc is opened read-only and
 //! every output is a new file under a `TempDir`.
 
+use dw4vhp_core::layout::Layout;
 use dw4vhp_core::patch::{patch_file, PatchOptions};
-use dw4vhp_core::plan::PatchPlan;
+use dw4vhp_core::plan::{PatchPlan, Preset, DESTRUCTIBLE_ROWS, TRIPWIRE_ROWS};
+use dw4vhp_core::rowgroup::ROW_GROUPS;
 use dw4vhp_core::serial::DEFAULT_SERIAL;
+use dw4vhp_core::table::EnemyTable;
 use dw4vhp_core::testkit;
 use md5::{Digest, Md5};
 use memmap2::Mmap;
@@ -185,6 +188,13 @@ fn golden_chain_reproduces_the_shipped_builds() {
     eprintln!("step 1 pristine md5: {pristine_md5}");
     assert_eq!(pristine_md5, "3185f04230b1dabd853db750e4b51108");
 
+    // The authored table, for step 6's "left exactly as authored" checks.
+    let authored = {
+        let file = File::open(&pristine).unwrap();
+        let mmap = unsafe { Mmap::map(&file).unwrap() };
+        EnemyTable::read(&mmap[..], &Layout::retail()).unwrap()
+    };
+
     // Step 2: the default Very Hard Plus preset reproduces the practice-buff
     // disc.
     let out = tmp.path().join("default.iso");
@@ -267,4 +277,76 @@ fn golden_chain_reproduces_the_shipped_builds() {
         4,
         "the difficulty patch must change exactly four bytes"
     );
+
+    // Step 6: the Brutal preset collapses every type onto its top row, leaves
+    // the destructibles and the 644/645 tripwire exactly as authored, and still
+    // carries the force-Very-Hard ELF word.
+    let brutal = tmp.path().join("brutal.iso");
+    patch_file(
+        &pristine,
+        &brutal,
+        &Preset::Brutal.plan(),
+        &PatchOptions { overwrite: false },
+        &mut |_| {},
+    )
+    .unwrap();
+
+    let collapsed = {
+        let file = File::open(&brutal).unwrap();
+        let mmap = unsafe { Mmap::map(&file).unwrap() };
+        EnemyTable::read(&mmap[..], &Layout::retail()).unwrap()
+    };
+
+    for group in ROW_GROUPS {
+        if group.rows.len() == 1 {
+            continue;
+        }
+        for &row in group.rows {
+            if row == group.top || TRIPWIRE_ROWS.contains(&row) {
+                continue;
+            }
+            assert_eq!(
+                collapsed.hp[row], collapsed.hp[group.top],
+                "{} row {row} HP",
+                group.model
+            );
+            assert_eq!(
+                collapsed.stat[row], collapsed.stat[group.top],
+                "{} row {row} stats",
+                group.model
+            );
+            assert_eq!(
+                collapsed.rarity[row], collapsed.rarity[group.top],
+                "{} row {row} rarity",
+                group.model
+            );
+        }
+    }
+
+    for row in DESTRUCTIBLE_ROWS.chain(TRIPWIRE_ROWS) {
+        assert_eq!(
+            (
+                collapsed.hp[row],
+                collapsed.stat[row],
+                collapsed.rarity[row]
+            ),
+            (authored.hp[row], authored.stat[row], authored.rarity[row]),
+            "row {row} must stay exactly as authored"
+        );
+    }
+
+    // The collapse changed no ELF byte: its difficulty region is the one the
+    // Extreme build (out5) wrote, and differs from the pristine disc's.
+    let elf = testkit::elf_region_offset(&brutal).unwrap();
+    assert_eq!(read_word(&brutal, elf), read_word(&out5, elf));
+    assert_ne!(read_word(&pristine, elf), read_word(&out5, elf));
+}
+
+/// The four bytes at `offset`, read without mapping a 1.4 GB image.
+fn read_word(path: &Path, offset: u64) -> [u8; 4] {
+    let mut file = File::open(path).unwrap();
+    file.seek(SeekFrom::Start(offset)).unwrap();
+    let mut word = [0u8; 4];
+    file.read_exact(&mut word).unwrap();
+    word
 }

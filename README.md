@@ -127,11 +127,14 @@ DW4_GOLDEN_BLOCKS_JSON=/path/to/iso_orig_blocks.json \
 cargo test -p dw4vhp-core --test golden -- --nocapture
 ```
 
-It takes ~6 minutes against the real discs and asserts three known md5s: the
+It takes ~7 minutes against the real discs and asserts three known md5s: the
 reconstructed pristine master `3185f04230b1dabd853db750e4b51108`, the default
 Very Hard Plus build `df426b9ff17c9e8218779f8ff1ecf524`, and the practice-buff-off
 build `f760258575f4fe2de05a9930e0a6b396` — plus that the serial and force-Very-Hard
-options touch only their expected regions and leave the input untouched.
+options touch only their expected regions and leave the input untouched. A final
+step 6 proves the Brutal preset on the real disc: every enemy row is collapsed
+onto its type's top row, the destructible and tripwire rows stay exactly as
+authored, and the force-Very-Hard ELF word is the Extreme build's.
 
 When the three variables are unset, the test **skips cleanly** rather than
 failing, so a normal `cargo test --workspace` (and CI) is unaffected.
