@@ -42,10 +42,11 @@ disc, plus a thin GUI over it.
 - egui GUI (one screen) and a headless engine that is byte-exactly testable.
 - CI + release bundling for Windows and Linux.
 
-### v2 (designed for, not built here)
+### v2 (designed in §12, built in stage 2)
 
 - **Very Hard Plus — Brutal**: force Very Hard *and* collapse every spawn to its enemy type's
-  strongest row. Blocked on a row→type mapping the disc does not carry — see §12.
+  strongest row. The row→type mapping the disc does not carry is now a committed, verified
+  data table — see §12.
 
 ### Non-goals
 
@@ -279,8 +280,9 @@ docs/                   this spec, plus a README explaining discs and verificati
 2. **Derive** — the ratio vector (§3.2).
 3. **Plan** — turn a `PatchPlan` plus the authored table into the new table, a list of write
    regions, and a summary (`rows changed`, `rows pinned at the attack ceiling`, `rows at the
-   HP cap`, `practice rows rewritten`, `ELF step`, `serial step`). This is what the Analyze
-   button shows and what the GUI displays live, and it is pure — no I/O.
+   HP cap`, `practice rows rewritten`, `rows collapsed to their type's top row` in Brutal,
+   `ELF step`, `serial step`). This is what the Analyze button shows and what the GUI
+   displays live, and it is pure — no I/O.
 4. **Write** — stream a copy of the input to `<output>.part` with progress, then reopen the
    part file read-write and apply the write regions, fsync, and rename into place. The input
    handle stays read-only for the whole run.
@@ -304,6 +306,7 @@ struct PatchPlan {
     exclude_destructibles: bool,      // rows 370-378                       (default true)
     exclude_tripwire: bool,           // rows 644/645                       (default true)
     practice_buff: bool,              // rows 638-643                       (default true)
+    collapse_to_top: bool,            // each type's rows -> its top row    (default false)
     force_very_hard: bool,            // the ELF instruction patch          (default false)
     serial: Option<String>,           // None = leave the serial alone      (default None)
 }
@@ -311,14 +314,17 @@ struct PatchPlan {
 
 ## 8. Presets and the GUI
 
-| Preset | ratios | crown | practice buff | force Very Hard | serial |
-|---|---|---|---|---|---|
-| **Very Hard Plus** (default) | derived ×1.0 | 5 | on | off | off |
-| **Very Hard Plus — Extreme** | derived ×1.0 | 5 | on | **on** | off |
-| **Custom** (auto-selected on any edit) | editable | 0–5 | toggle | toggle | toggle |
+| Preset | ratios | crown | practice buff | collapse | force Very Hard | serial |
+|---|---|---|---|---|---|---|
+| **Very Hard Plus** (default) | derived ×1.0 | 5 | on | off | off | off |
+| **Very Hard Plus — Extreme** | derived ×1.0 | 5 | on | off | **on** | off |
+| **Very Hard Plus — Brutal** | derived ×1.0 | 5 | on | **on** | **on** | off |
+| **Custom** (auto-selected on any edit) | editable | 0–5 | toggle | toggle | toggle | toggle |
 
 Only the first is a shipped, byte-verified build (and it is the shipped practice-buff disc,
 `df426b9f…`). Extreme is new in exactly one respect: the one-instruction difficulty patch.
+Brutal adds the row collapse of §12 on top of Extreme, and is the only preset whose output no
+shipped disc can be compared against.
 
 The window is one screen, no wizard:
 
@@ -327,8 +333,8 @@ The window is one screen, no wizard:
   "not the NTSC-U release", "unrecognised revision").
 - **Preset dropdown** with a one-line description of the effective multipliers.
 - **Collapsible Advanced panel** — one editable multiplier per stat pre-filled with the
-  derived values, the crown rank, the exclusion toggles, the three toggles of §7. Any edit
-  switches the preset to Custom.
+  derived values, the crown rank, the exclusion toggles, the practice buff, force Very Hard,
+  and (Brutal) the row collapse. Any edit switches the preset to Custom.
 - **Output row** — pre-filled as `<input dir>/<name> [VeryHardPlus].iso`, with a free-space
   check.
 - **Analyze** (pre-flight report, writes nothing) and **Patch ISO** (disabled until a clean
@@ -393,6 +399,10 @@ therefore known-reachable, not merely expected.
   `beNDMWStatusInfo` table is unexplored, and the 2-player graduation tripwire has not been
   triggered.
 
+The shipped About panel and README state these three in plainer language (commit `c901c28`);
+the claims are identical. Brutal (§12) adds two more, recorded in §12.5: the row grouping is
+inferred from a runtime RAM snapshot, and the preset has never been played.
+
 ## 10. Licensing and repository rules
 
 - **GPL-3.0-or-later** — the LICENSE already in the repo, matching the decompilation project
@@ -416,36 +426,165 @@ therefore known-reachable, not merely expected.
   convention (pinned action SHAs, `persist-credentials: false`).
 - App icon generated from a committed source image, as the sibling project does.
 
-## 12. Deferred: Brutal (v2)
+## 12. Brutal (v2) — designed (added 2026-10-01, built in stage 2)
 
 **Very Hard Plus — Brutal** = force Very Hard *and* make every spawn use its enemy type's
 strongest row, so the variant a stage happens to pick no longer matters.
 
-It cannot be built from the disc alone. The three patchable columns carry no type identity —
-they are numbers. A spawn's row is chosen by the stage's generator entry, so "every enemy is
-its top variant" means either collapsing each type's rows onto its strongest row (whole-row
-copy, the same proven mechanism as the practice buff, in all 665 copies) or rewriting every
-stage's generator entries (`patch_spawn.py`, a per-stage job). The first needs a **row→type
-mapping**, which lives only in the runtime `MODEL` column.
+The disc cannot tell the patcher which rows belong together: the three patchable columns are
+numbers, and the `MODEL` column the game uses to tell rows apart exists only at runtime (it is
+not in the ISO — §2 non-goals). The partition is therefore committed as data. It was recovered
+from the runtime table and cross-checked against the clean ISO's authored table; what that
+check can and cannot prove is §12.3.
 
-The mapping is documented — `mods/crown-elite-stat-boosts.md` §6 lists all 41 models with a
-Base row and a Top row (`e_goburi` 0 → 393, `e_ogre` 33 → 41, `e_nume` 12 → 637, …) — but it
-has to be materialised as a committed **row-group table** (row indices only, no game bytes)
-and verified: each type's top row must be its block's maximum HP, and the known anchors
-(370–378, 379–393, 394–408, 409–423, 610–624, 638–645, the 69 empty rows) must fall out
-correctly. The layout is not a clean per-type sort — rows 609 and 637 are special high-stat
-rows for `e_ldknight`/`e_nume` sitting among other types — so this is a verification exercise,
-not a guess.
+### 12.1 The row-group table
 
-Prerequisites for v2, in order: build the row-group table; verify it against the documented
-anchors and top rows; decide whether Brutal's collapse should also override the exclusions
-(destructibles and the tripwire); then implement it as one more `PatchPlan` field.
+New module `crates/dw4vhp-core/src/rowgroup.rs`:
 
-Accepted consequence, to state in the UI when it lands: collapsing to a type's top row
-collapses everything that row carries — EXP payouts (mostly at the 32 767 ceiling, so every
-kill pays the same), resists and crit/paralysis. Combined with the flat attack column, Brutal
-is close to uniform enemies at the ceiling, which is the intent of the preset but the opposite
-of the differentiation the other presets retain.
+```rust
+pub struct RowGroup {
+    pub model: &'static str,     // e.g. "e_goburi"
+    pub top: usize,              // this group's strongest (max-HP) authored row
+    pub rows: &'static [usize],  // every authored row of this model, ascending
+}
+pub const ROW_GROUPS: &[RowGroup];   // 48 groups: 39 enemy types + 9 g_* props
+```
+
+Row indices and model names only — no game bytes, matching §10. An embedded `const` rather
+than a data file: no new dependency, the shape is checked at compile time, and it is how
+`PRACTICE_MAP`, `DESTRUCTIBLE_ROWS` and `TRIPWIRE_ROWS` already live. Full membership, 580
+rows in 48 groups, ordered by first row:
+
+| model | rows | top |
+|---|---|---|
+| `e_goburi` | 0-11, 379-393, 638-639 | 393 |
+| `e_nume` | 12-23, 448-453, 636-637, 642-643 | 637 |
+| `e_scum` | 24-32, 454-459 | 32 |
+| `e_ogre` | 33-41, 460-462, 640-641 | 41 |
+| `e_mecha1` | 42-56, 463-468 | 56 |
+| `e_mecha4` | 57-65, 67, 70, 73, 469-477 | 73 |
+| `e_mecha4bs` | 68, 71, 74 | 74 |
+| `e_blosso` | 76, 78, 80, 82, 85, 88 | 88 |
+| `e_cockatri` | 91, 93, 95, 644-645 | 95 |
+| `e_mammos` | 97-98, 100-101, 103-104 | 104 |
+| `f_apocaly` | 106, 109, 112 | 112 |
+| `e_mummy` | 114-125, 394-408, 478-489 | 408 |
+| `e_mecha2` | 126-149, 490-492, 610-624 | 624 |
+| `e_tyrano` | 150-158 | 158 |
+| `e_minotaru` | 159-167, 493-498 | 167 |
+| `e_pharaoh` | 168-176, 499-510 | 176 |
+| `e_arachne` | 178, 180, 182 | 182 |
+| `e_skulgrey` | 183-185, 187, 190, 193, 511-522 | 522 |
+| `e_anomalo` | 196-197, 199-200, 202-203 | 203 |
+| `f_belvam` | 205, 208, 211 | 211 |
+| `e_otama` | 213-224, 409-426, 523-534 | 423 |
+| `e_geko` | 225-233, 427-432, 535-546 | 432 |
+| `e_torta` | 234-242 | 242 |
+| `e_maridevi` | 243-251, 547-558 | 251 |
+| `e_mecha3` | 252-258, 260-266, 268-274, 630-632, 646-648 | 648 |
+| `e_tonogeko` | 276-278, 280-281, 283-284, 286-287, 559-570 | 570 |
+| `e_diabolo` | 289, 292, 295 | 295 |
+| `f_luce` | 298, 301, 304 | 304 |
+| `e_infermo` | 306-314, 439-444, 571-582, 627-629 | 444 |
+| `e_megadra` | 315-323, 445-447, 583-594 | 323 |
+| `e_rare` | 324-332, 595-606 | 332 |
+| `e_impdra` | 333-338 | 338 |
+| `e_mecha5` | 339-347 | 345 |
+| `e_ldknight` | 348-356, 607-609 | 609 |
+| `f_devl1b` | 357-359 | 359 |
+| `f_devl1` | 360-362 | 362 |
+| `f_devl22` | 363-365 | 365 |
+| `f_devl3` | 366-368 | 368 |
+| `g_box` | 370 | 370 |
+| `g_boxfield` | 371 | 371 |
+| `g_bbarrelsz01` | 372 | 372 |
+| `g_bbarrelsz02` | 373 | 373 |
+| `g_chakraz03` | 374 | 374 |
+| `g_woodencasez01` | 375 | 375 |
+| `g_woodencasez02` | 376 | 376 |
+| `g_woodencasez03` | 377 | 377 |
+| `g_woodencasez05` | 378 | 378 |
+| `f_luce2` | 633-635 | 635 |
+
+Provenance: `tools/rowgroups.py` (committed, not run in CI) reads a runtime RAM snapshot of
+the authored table and prints this table. The numbers above come from
+`pi-re/snapshots/pink_ram.bin`, whose HP column is byte-identical to the clean ISO's HP block
+on all 649 rows — which is what makes it the authored table rather than a patched one.
+
+`top` is the group's **maximum authored HP** row. The criterion is pinned rather than implied:
+it reproduces the documented `Top row` for all 39 enemy types
+(`mods/crown-elite-stat-boosts.md` §6), and ranking by attack instead would pick differently
+for the groups whose attack clamps. (That document's "41 models" counts the `g_*` props
+differently; the table here is 39 enemy types + 9 props.)
+
+### 12.2 The transform stage
+
+`PatchPlan` gains `collapse_to_top: bool` (default `false`). In `transform`, after the scaling
+loop and before the practice buff:
+
+```text
+for each group in ROW_GROUPS:
+    if group.rows.len() == 1: continue          // every g_* destructible is a single row
+    for each row in group.rows except group.top:
+        if row in COLLAPSE_SKIP_ROWS (638..=645): continue
+        copy group.top's hp / stat / crit / para / rarity onto row
+```
+
+This is the same whole-row copy as the practice buff (§3.6), applied to the *computed*
+(scaled and clamped) table and to the same 665 copies — no new write mechanism, so §3.3's caps
+and §6's preconditions are unchanged.
+
+- **Rows 638–645 are skipped.** That keeps the tutorial's buffed lesson rows and keeps the
+  2-player graduation tripwire (644/645) byte-identical, so the self-checking 2-player test
+  still identifies that row. The skip set is exactly the practice map's destinations (§3.6)
+  plus the tripwire pair (§3.4).
+- **Destructibles need no rule.** Each `g_*` model has exactly one row, so collapse cannot
+  change them; the single-row guard keeps that true if the table ever changes.
+- **Order with the practice buff** is not observable today, because every buff destination is
+  skipped; it is pinned anyway (collapse, then buff) and asserted by a test.
+- `PlanSummary` gains `collapsed_rows`. The attack-ceiling and HP-cap counters are computed
+  during scaling, before collapse, and collapse copies already-clamped values, so no counter is
+  invalidated.
+
+Accepted consequence, stated in the UI: collapsing to a type's top row collapses everything
+that row carries — EXP payouts (mostly at the 32 767 ceiling, so every kill pays the same),
+resists and crit/paralysis. Combined with the flat attack column, Brutal is close to uniform
+enemies at the ceiling, which is the intent of the preset but the opposite of the
+differentiation the other presets retain.
+
+### 12.3 What is verified about the table, and what is not
+
+Checked from the clean ISO alone (§9 tests):
+
+- 580 live rows, each in exactly one group; the 69 empty rows (HP 0) in none; groups disjoint;
+  `rows` ascending, non-empty, and free of duplicates.
+- `top` is each group's maximum-HP row in the authored table.
+- The nine `g_*` groups are exactly rows 370–378, one row each.
+- Crown anchors: 379–393 all `e_goburi`, 394–408 all `e_mummy`, 610–624 all `e_mecha2`; the
+  `e_otama` block 409–423 is `e_otama`, whose group runs on to 426.
+- Practice anchors: 638/639 `e_goburi`, 640/641 `e_ogre`, 642/643 `e_nume`, 644/645
+  `e_cockatri` (§3.6, and the decomp's own measurement).
+- The special high-stat rows land where the decomp notes say: `e_ldknight`'s top is 609 and
+  `e_nume`'s is 637, both sitting among other types' ordinary rows, and `e_mecha4` (57–65, 67,
+  70, 73, 469–477) interleaves with `e_mecha4bs` (68, 71, 74).
+
+**Not** checkable, and therefore stated in the module doc, in this spec and in the About
+panel: that these groups are the game's real type partition. That came from the runtime
+`MODEL` column and cannot be re-derived without an emulator.
+
+### 12.4 Preset and GUI
+
+`Preset::Brutal` with `label()` `"Very Hard Plus — Brutal"` and `plan()` =
+`PatchPlan::default()` + `force_very_hard` + `collapse_to_top`; `Preset::detect()` gains the arm
+(§8 table) and the GUI's preset loop gains the entry. `Custom` stays the fallback for any
+other plan.
+
+### 12.5 Not verified
+
+- The grouping is inferred from a runtime RAM snapshot, and nothing in the repo can re-derive
+  it (§12.3).
+- Brutal has never been played: with no emulator here, "every enemy really spawns as its
+  type's strongest row in game" is unconfirmed, exactly like force Very Hard (§9).
 
 ## 13. Risks
 
@@ -454,6 +593,7 @@ of the differentiation the other presets retain.
 | A write lands at a wrong offset and corrupts a 1.4 GB copy | Every write is gated on a precondition (§6) and the input is only ever read; the worst case is a bad copy, never a damaged original |
 | Byte-exactness drift from the Python patcher | Golden tests assert md5s of the shipped discs; ties-to-even rounding is pinned in §3.3 |
 | Wrong disc revision slips through | Anchors + exact 665-copy count + ELF shape; refuse otherwise |
+| The committed row→type grouping is wrong (a type's rows split or merged), which no ISO check can prove | The table is committed, reviewable data with ISO-checkable invariants (§12.3); the limit is stated in the module doc, in the spec and in the About panel, and the preset is labelled unplayed |
 | Force Very Hard misbehaves in game | One instruction, semantically argued, precondition-checked, and clearly labelled unverified; it is only in the Extreme preset, never the default |
 | 1.4 GB copy is slow or the disk fills | Free-space check up front, `.part` file + rename, progress and cancel |
 | Players point it at an already-modded disc | Explicit detection and message; the always-copy model means they can always start over from their original |
