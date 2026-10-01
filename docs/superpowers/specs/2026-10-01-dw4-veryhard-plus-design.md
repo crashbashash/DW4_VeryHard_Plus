@@ -219,7 +219,7 @@ addiu s0, zero, 1   == OP(0x09)<<26 | rs=0<<21 | rt=16<<16 | imm=1              
 Location: `SLUS_208.36` is the boot ELF, ISO9660 entry at LBA 289 (ISO offset `0x90800`),
 length 4 541 744. Its first program header is `PT_LOAD vaddr 0x100000 / file offset 0x80`, so
 the vaddr→file mapping is read from the ELF's own program headers rather than assumed. For the
-retail disc, `0x371DDC` lands at ISO offset `0x302650`.
+retail disc, `0x371DDC` lands at ISO offset `0x30265C` (and `0x371DD0` at `0x302650`).
 
 This is the one part of v1 that **cannot be verified in-game here** — see §9.
 
