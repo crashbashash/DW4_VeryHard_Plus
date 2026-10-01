@@ -361,6 +361,14 @@ Steps 1–3 are byte-exact end-to-end proofs that the Rust port reproduces the P
 implementation on real data. The test skips cleanly (not fails) when the discs are absent, and
 the paths come from environment variables. Discs are never added to git.
 
+**Validated during planning (2026-10-01).** The chain was exercised end-to-end against the real
+discs before this plan was written, using a throwaway Python reference implementation of §3:
+step 1 reproduced `3185f04230b1dabd853db750e4b51108`; step 2 produced `df426b9f…` with the
+default preset; step 3 produced `f7602585…` with the practice toggle off. The ratio derived from
+the pristine ISO's own bytes matched the §3.2 vector on every one of the fifteen factors, and
+each block was found and rewritten in exactly 665 copies. The md5 targets in steps 1–3 are
+therefore known-reachable, not merely expected.
+
 ### Unit and property tests
 
 - The ratio derivation, against the authored table (pinned to the vector in §3.2).
