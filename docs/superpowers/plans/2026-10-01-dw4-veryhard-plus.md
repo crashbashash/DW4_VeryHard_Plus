@@ -391,7 +391,7 @@ fn multipliers_scale_the_derived_factors() {
     p.stat_mult[0] = 3.0;
     let (out, _) = transform(&t, &p, &ratio);
     assert_eq!(out.hp[0], 650);              // 100 * 6.5
-    assert_eq!(out.stat[0][0], 600);         // 10 * 6.0
+    assert_eq!(out.stat[0][0], 60);         // 10 * 6.0
     assert_eq!(out.crit[0], 2);              // 2 + 0
 }
 ```
