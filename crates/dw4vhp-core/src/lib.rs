@@ -7,6 +7,7 @@ pub mod patch;
 pub mod plan;
 pub mod ratio;
 pub mod region;
+pub mod rowgroup;
 pub mod serial;
 pub mod table;
 pub mod testkit;
