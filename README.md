@@ -136,6 +136,26 @@ Every constant the engine needs is an offset, a row index, a field name, or an
 instruction encoded from its fields; the "before" values come from the player's
 own disc at runtime.
 
+## Release bundles
+
+Tagged releases (`v*`) are built and published by
+`.github/workflows/release.yml`:
+
+| Asset | Contents |
+| --- | --- |
+| `dw4-veryhard-plus-<tag>-windows-x86_64.zip` | the release `.exe` |
+| `dw4-veryhard-plus-<tag>-linux-x86_64.AppImage` | the app in one file |
+| `dw4-veryhard-plus-<tag>-linux-x86_64.deb` | the app installed to `/usr/bin` with a desktop entry and icon |
+| `dw4-veryhard-plus-<tag>-linux-x86_64.tar.gz` | the plain binary |
+
+The Linux bundles are built and launch-verified here (the AppImage is run
+headlessly under Xvfb). The Windows zip is built in CI, but launching the `.exe`
+is unverified in this environment — it has not been run here.
+
+The app icon is generated from committed artwork at
+`crates/dw4vhp-gui/icons/source.png` by `tools/gen_icon.py`, which writes
+`crates/dw4vhp-gui/icons/icon.png` (256²) — the single image the window embeds.
+
 ## Licence
 
 GPL-3.0-or-later (see `LICENSE`).

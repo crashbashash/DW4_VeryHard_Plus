@@ -20,8 +20,19 @@ fn main() -> eframe::Result {
         }
     }
 
+    let viewport = egui::ViewportBuilder::default()
+        .with_inner_size([760.0, 720.0])
+        .with_title("DW4 Very Hard Plus");
+
+    // The icon is the committed, generated `icons/icon.png`; the decode cannot
+    // fail in practice, but a bad image must not stop the window from opening.
+    let viewport = match eframe::icon_data::from_png_bytes(include_bytes!("../icons/icon.png")) {
+        Ok(icon) => viewport.with_icon(icon),
+        Err(_) => viewport,
+    };
+
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([760.0, 720.0]),
+        viewport,
         ..Default::default()
     };
     eframe::run_native(
