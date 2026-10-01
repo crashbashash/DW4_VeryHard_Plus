@@ -28,12 +28,18 @@ const STAT_NAMES: [&str; 12] = [
     "atk", "def", "wis", "spr", "spd", "fire", "ice", "thunder", "dark", "stun", "poison", "exp",
 ];
 
-const CAVEAT_FORCE_VERY_HARD: &str = "Force Very Hard has never been played — it is one \
-     instruction, semantically equivalent to the documented mod, but unverified in-game.";
-const CAVEAT_VERY_HARD_TIER2: &str = "Very Hard selects tier-2 rows by inference from the block \
-     layout; Normal and Hard were verified live, Very Hard was not.";
-const CAVEAT_MOD_OPEN_ITEMS: &str = "The mod's own open items carry over: every boss row except \
-     one is unmeasured, and about sixteen variant models have no row of their own.";
+const CAVEAT_FORCE_VERY_HARD: &str = "Force Very Hard has never been played. It is a new \
+     implementation (one instruction) that is semantically equivalent to the documented mod, but \
+     \"the game really does run Very Hard after this patch\" is unconfirmed here — there is no \
+     emulator in this environment.";
+const CAVEAT_VERY_HARD_TIER2: &str =
+    "Very Hard → tier 2 is inferred, not measured. Normal → tier 0 \
+     and Hard → tier 1 were verified live on the valley bridge; the Very Hard leg follows from the \
+     3-tier × 3–4-variant block layout. So Extreme's effect size is documented as inferred.";
+const CAVEAT_MOD_OPEN_ITEMS: &str = "The mod's own open items carry over verbatim: every boss row \
+     except `e_mecha4` row 60 is unmeasured, ~16 variant models have no row of their own, the \
+     88-record `beNDMWStatusInfo` table is unexplored, and the 2-player graduation tripwire has not \
+     been triggered.";
 
 /// The window's whole state between frames.
 pub struct App {
@@ -295,6 +301,8 @@ impl App {
             self.state.preset = preset;
             if preset != Preset::Custom {
                 self.state.plan = preset.plan();
+                self.serial_enabled = false;
+                self.serial_text = DEFAULT_SERIAL.to_string();
                 self.refresh_summary();
             }
         }
