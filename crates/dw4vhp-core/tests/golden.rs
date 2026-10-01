@@ -236,6 +236,7 @@ fn golden_chain_reproduces_the_shipped_builds() {
     let changed = testkit::changed_offsets(&out, &out4);
     let (a, b) = testkit::serial_offsets(&out).unwrap();
     eprintln!("step 4 serial changed runs: {changed:?} (serial ranges {a:#X}, {b:#X})");
+    assert!(!changed.is_empty(), "the serial step produced no changes");
     assert!(
         changed
             .iter()
@@ -261,4 +262,9 @@ fn golden_chain_reproduces_the_shipped_builds() {
     let elf_changed = testkit::changed_offsets(&out, &out5);
     eprintln!("step 5 force_very_hard changed runs: {elf_changed:?} (elf at {elf:#X})");
     assert_eq!(elf_changed, vec![elf]);
+    assert_eq!(
+        testkit::changed_byte_count(&out, &out5),
+        4,
+        "the difficulty patch must change exactly four bytes"
+    );
 }
