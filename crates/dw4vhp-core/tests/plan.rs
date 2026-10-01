@@ -50,6 +50,26 @@ fn exclusions_are_left_byte_identical_and_every_other_row_gets_the_crown() {
 }
 
 #[test]
+fn the_summary_counts_live_rows_by_non_zero_authored_hp() {
+    let mut t = blank();
+    let ratio = RatioVector {
+        hp: 1.0,
+        stat: [1.0; 12],
+        crit_delta: 0.0,
+        para_delta: 0.0,
+    };
+
+    let (_, all) = transform(&t, &PatchPlan::default(), &ratio);
+    assert_eq!(all.live_rows, 649); // every blank row has HP, so every row is live
+
+    t.hp[5] = 0; // a slot the disc never filled
+    t.hp[644] = 0; // an *excluded* row: the live base is the authored table, not the handled rows
+    let (_, s) = transform(&t, &PatchPlan::default(), &ratio);
+    assert_eq!(s.live_rows, 649 - 2);
+    assert_eq!(s.rows_changed, 649 - 11);
+}
+
+#[test]
 fn the_i16_clamp_pins_high_values_and_does_not_keep_the_authored_value() {
     let mut t = blank();
     t.stat[0][0] = 30_000; // 30000 * 2 overflows

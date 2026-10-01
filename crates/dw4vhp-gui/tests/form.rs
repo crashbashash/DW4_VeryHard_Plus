@@ -1,0 +1,68 @@
+// crates/dw4vhp-gui/tests/form.rs
+use dw4vhp_core::error::Error;
+use dw4vhp_core::plan::{PlanSummary, Preset};
+use dw4vhp_gui::form::{attack_pin_note, default_output_path, status_for, StatusKind, UiState};
+use std::path::{Path, PathBuf};
+
+#[test]
+fn the_default_output_name_keeps_the_directory_and_marks_the_suffix() {
+    let p = default_output_path(Path::new("/games/Digimon World 4 (USA).iso"));
+    assert_eq!(
+        p,
+        PathBuf::from("/games/Digimon World 4 (USA) [VeryHardPlus].iso")
+    );
+}
+
+#[test]
+fn editing_any_knob_switches_the_preset_to_custom() {
+    let mut s = UiState {
+        preset: Preset::VeryHardPlus,
+        ..Default::default()
+    };
+    s.plan.crown_rank = 3;
+    s.on_plan_edited();
+    assert_eq!(s.preset, Preset::Custom);
+}
+
+#[test]
+fn an_already_modded_disc_is_refused_with_the_fix() {
+    let l = status_for(&Err(Error::AlreadyModded {
+        rarity_nonzero: 638,
+    }));
+    assert_eq!(l.kind, StatusKind::Refused);
+    assert!(l.text.contains("original"), "{}", l.text);
+}
+
+#[test]
+fn a_wrong_revision_is_refused_and_names_the_supported_release() {
+    let l = status_for(&Err(Error::WrongRevision {
+        block: "HPMAX",
+        found: 1,
+        expected: 665,
+    }));
+    assert_eq!(l.kind, StatusKind::Refused);
+    assert!(l.text.contains("SLUS_208.36"), "{}", l.text);
+}
+
+#[test]
+fn the_attack_note_names_the_pinned_count_and_the_live_base() {
+    let s = PlanSummary {
+        attack_pinned: 337,
+        live_rows: 580,
+        ..Default::default()
+    };
+    assert_eq!(
+        attack_pin_note(&s).unwrap(),
+        "attack: 337 of 580 live rows pinned at 32767"
+    );
+}
+
+#[test]
+fn the_attack_note_is_absent_when_nothing_is_pinned() {
+    let s = PlanSummary {
+        attack_pinned: 0,
+        live_rows: 580,
+        ..Default::default()
+    };
+    assert!(attack_pin_note(&s).is_none());
+}

@@ -116,6 +116,11 @@ impl Preset {
 #[derive(PartialEq, Eq, Debug, Default, Clone)]
 pub struct PlanSummary {
     pub rows_changed: usize,
+    /// Rows whose authored HP is non-zero: the retail table's 580 live rows
+    /// (649 authored slots less the 69 that were never filled). It counts the
+    /// live rows of the whole table, including excluded ones, so an attack
+    /// report can state the base it pinned a share of.
+    pub live_rows: usize,
     pub attack_pinned: usize,
     pub hp_capped: usize,
     pub crit_pinned: usize,
@@ -144,6 +149,7 @@ pub fn transform(
     let mut summary = PlanSummary {
         elf_step: plan.force_very_hard,
         serial_step: plan.serial.is_some(),
+        live_rows: authored.hp.iter().filter(|hp| **hp > 0).count(),
         ..PlanSummary::default()
     };
 
