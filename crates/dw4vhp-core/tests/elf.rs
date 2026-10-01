@@ -53,3 +53,16 @@ fn refuses_when_the_instruction_is_not_what_it_expects() {
         Error::UnexpectedInstruction { .. }
     ));
 }
+
+#[test]
+fn refuses_when_no_segment_maps_the_difficulty_vaddr() {
+    let iso = testkit::iso_with_elf();
+    let elf = ElfInfo {
+        iso_offset: 0,
+        phdrs: vec![],
+    };
+    assert!(matches!(
+        difficulty_region(&iso, &elf).unwrap_err(),
+        Error::ElfNotFound
+    ));
+}
