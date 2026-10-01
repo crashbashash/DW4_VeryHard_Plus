@@ -21,6 +21,15 @@ fn accepts_a_clean_fixture() {
 }
 
 #[test]
+fn an_empty_file_is_not_this_disc_not_a_mmap_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("empty.iso");
+    std::fs::File::create(&path).unwrap();
+    let err = inspect(&path, &Layout::mini(1, 1)).unwrap_err();
+    assert!(matches!(err, Error::NotThisDisc), "{err:?}");
+}
+
+#[test]
 fn a_wrong_copy_count_is_a_revision_mismatch() {
     let (dir, path, _) = testkit::clean_disc_tempfile(); // the fixture writes 3 copies
     let err = inspect(&path, &Layout::mini(649, 665)).unwrap_err();

@@ -2,6 +2,8 @@ use crate::error::{Error, Result};
 use crate::iso9660::{self, IsoFile};
 use crate::layout::Layout;
 use crate::table::EnemyTable;
+use memmap2::Mmap;
+use std::fs::File;
 use std::path::Path;
 
 /// The boot ELF's ISO9660 name, without its `;1` version suffix.
@@ -48,7 +50,16 @@ pub struct DiscReport {
 /// Reads the disc at `path` and refuses it unless it is an unpatched copy of
 /// the release `layout` describes. Nothing is written.
 pub fn inspect(path: &Path, layout: &Layout) -> Result<DiscReport> {
-    inspect_bytes(&std::fs::read(path)?, layout)
+    let file = File::open(path)?;
+    // Safety: the mapping is read-only and `path` is never written while mapped.
+    // `Mmap::map` refuses an empty file, so hand that empty input to
+    // `inspect_bytes` directly: it produces the same refusal `std::fs::read`
+    // did before this was memory-mapped.
+    if file.metadata()?.len() == 0 {
+        return inspect_bytes(&[], layout);
+    }
+    let mmap = unsafe { Mmap::map(&file)? };
+    inspect_bytes(&mmap[..], layout)
 }
 
 /// The checks [`inspect`] applies, in order, against an image already in memory.
@@ -56,8 +67,8 @@ pub fn inspect(path: &Path, layout: &Layout) -> Result<DiscReport> {
 /// 1. the three authored blocks parse, else [`Error::NotThisDisc`];
 /// 2. each block occurs exactly [`Layout::expected_copies`] times, else
 ///    [`Error::WrongRevision`] naming the block;
-/// 3. more than 100 rows carry a crown, then the report is returned, otherwise
-///    [`Error::AlreadyModded`].
+/// 3. more than 100 rows carry a crown, then [`Error::AlreadyModded`],
+///    otherwise the report is returned.
 pub fn inspect_bytes(iso: &[u8], layout: &Layout) -> Result<DiscReport> {
     let authored = EnemyTable::read(iso, layout)?;
 
