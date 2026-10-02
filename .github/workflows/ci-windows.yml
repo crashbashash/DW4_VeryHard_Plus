@@ -57,5 +57,5 @@ jobs:
       - uses: actions/setup-node@v4
       - run: npm ci
       - run: npm run build
-      - run: cargo clippy -p dw4vhp-tauri --all-targets -- -D warnings
-      - run: cargo build -p dw4vhp-tauri
+      - run: cargo clippy --manifest-path crates/dw4vhp-tauri/Cargo.toml --all-targets -- -D warnings
+      - run: cargo build --manifest-path crates/dw4vhp-tauri/Cargo.toml
