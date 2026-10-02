@@ -42,10 +42,12 @@ jobs:
         run: |
           $version = $env:ASSET_VERSION.TrimStart("v")
           # The bundler's MSI (WiX, UpgradeCode pinned in tauri.conf.json)
-          # lands in target\release\bundle\msi.
-          $msi =
-            "target\release\bundle\msi\dw4-veryhard-plus-$version-windows-x86_64.msi"
-          Copy-Item $msi -Destination .
+          # lands in target\release\bundle\msi under a bundler-chosen name;
+          # copy whichever MSI it produced under the asset name.
+          $msi = Get-ChildItem "target\release\bundle\msi" -Filter *.msi |
+            Select-Object -First 1
+          Copy-Item $msi.FullName `
+            -Destination "dw4-veryhard-plus-$version-windows-x86_64.msi"
           Get-Item *.msi | Select-Object -ExpandProperty FullName
 
       - name: Upload Windows assets

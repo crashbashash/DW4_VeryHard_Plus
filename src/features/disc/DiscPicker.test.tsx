@@ -12,7 +12,7 @@ function setup(status: { kind: string; text: string } | null) {
       status={status as never}
       analyzing={false}
       onPick={pickDisc}
-      onSetOutput={() => {}}
+      onCommitDiscPath={() => {}}
     />,
   );
   return pickDisc;

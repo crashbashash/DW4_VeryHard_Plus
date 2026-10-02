@@ -16,3 +16,7 @@ node_modules
 .superpowers/
 node_modules
 .vitest/
+node_modules
+.superpowers/
+.vitest/
+dist/

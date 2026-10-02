@@ -15,11 +15,58 @@ use dw4vhp_core::layout::Layout;
 use dw4vhp_core::patch::{patch_file_with_layout, PatchOptions};
 use dw4vhp_core::plan::{transform, PatchPlan, PlanSummary};
 use dw4vhp_core::ratio::RatioVector;
-use serde::Serialize;
-use tauri::{AppHandle, Manager, State};
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Emitter, Manager};
 
 /// The marker a patched image's name carries (old `form::OUTPUT_SUFFIX`).
 const OUTPUT_SUFFIX: &str = " [VeryHardPlus].iso";
+
+/// The wire form of a patch plan: camelCase over the engine's `PatchPlan`.
+/// A dedicated payload type because the engine type carries no `Deserialize`
+/// (and the engine crate stays serde-free by design).
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanPayload {
+    hp_mult: f64,
+    stat_mult: Vec<f64>,
+    crit_mult: f64,
+    para_mult: f64,
+    crown_rank: u8,
+    exclude_destructibles: bool,
+    exclude_tripwire: bool,
+    exclude_practice: bool,
+    practice_buff: bool,
+    collapse_to_top: bool,
+    force_very_hard: bool,
+    serial: Option<String>,
+}
+
+impl PlanPayload {
+    fn into_plan(self) -> Result<PatchPlan, String> {
+        Ok(PatchPlan {
+            hp_mult: self.hp_mult,
+            stat_mult: {
+                let mut stat_mult = [0.0; 12];
+                let values: [f64; 12] = self
+                    .stat_mult
+                    .try_into()
+                    .map_err(|_| "stat_mult must carry exactly 12 values".to_string())?;
+                stat_mult.copy_from_slice(&values);
+                stat_mult
+            },
+            crit_mult: self.crit_mult,
+            para_mult: self.para_mult,
+            crown_rank: self.crown_rank,
+            exclude_destructibles: self.exclude_destructibles,
+            exclude_tripwire: self.exclude_tripwire,
+            exclude_practice: self.exclude_practice,
+            practice_buff: self.practice_buff,
+            collapse_to_top: self.collapse_to_top,
+            force_very_hard: self.force_very_hard,
+            serial: self.serial,
+        })
+    }
+}
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -167,9 +214,10 @@ pub async fn analyze(
 /// this on every plan edit; it reads the disc table stored by [`analyze`].
 #[tauri::command]
 pub async fn plan_summary(
-    plan: PatchPlan,
+    plan: PlanPayload,
     app: AppHandle,
 ) -> Result<PlanSummaryPayload, String> {
+    let plan = plan.into_plan()?;
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
         let report = state.report.lock().expect("report lock");
@@ -192,11 +240,12 @@ pub async fn plan_summary(
 /// Returns `Err` synchronously only when no disc has been analysed yet.
 #[tauri::command]
 pub async fn start_patch(
-    plan: PatchPlan,
+    plan: PlanPayload,
     output: String,
     overwrite: bool,
     app: AppHandle,
 ) -> Result<(), String> {
+    let plan = plan.into_plan()?;
     let input = {
         let state = app.state::<AppState>();
         let stored = state.input.lock().expect("input lock");

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { App } from "./App";
 import { mockBackend } from "../ipc/mock";
@@ -82,3 +82,27 @@ async function user_clickExtreme() {
   const user = (await import("@testing-library/user-event")).default;
   await user.click(screen.getByText("Very Hard Plus — Extreme"));
 }
+
+describe("App disc wiring", () => {
+  test("typing an ISO path into the disc field starts analysis", async () => {
+    render(<App />);
+    const user = (await import("@testing-library/user-event")).default;
+    const field = screen.getByLabelText("disc path");
+    await user.type(field, "/mock/game.iso");
+    await user.tab(); // commit on blur, as the old egui app did
+    await waitFor(() => expect(screen.getByText(/clean mock disc/)).toBeTruthy());
+  });
+
+  test("typing into the disc field suggests the output name", async () => {
+    render(<App />);
+    const user = (await import("@testing-library/user-event")).default;
+    const field = screen.getByLabelText("disc path");
+    await user.type(field, "/mock/mygame.iso");
+    await user.tab(); // commit on blur
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText("output path") as HTMLInputElement).value,
+      ).toBe("/mock/mygame [VeryHardPlus].iso"),
+    );
+  });
+});

@@ -136,8 +136,15 @@ function AppInner() {
     if (path !== null) disc.setOutputPath(path);
   };
 
+  const setDiscPath = (path: string) => {
+    // Typing a path by hand commits on Enter/blur via analysis; until then it
+    // only fills the field. A typed path is treated like a dropped file once
+    // it names an .iso.
+    void disc.setInputPath(path);
+  };
+
   const setOutput = (path: string) => {
-    if (disc.inputPath === null) disc.setOutputPath(path);
+    disc.setOutputPath(path);
   };
 
   return (
@@ -151,12 +158,13 @@ function AppInner() {
       <main className={`app-main ${wide ? "layout-two-col" : "layout-one-col"}`}>
         <div className="col">
           <DiscPicker
+            key={disc.inputPath ?? ""}
             inputPath={disc.inputPath}
             outputPath={disc.outputPath}
             status={disc.status}
             analyzing={disc.analyzing}
             onPick={() => void disc.pickDisc()}
-            onSetOutput={setOutput}
+            onCommitDiscPath={setDiscPath}
           />
           <PresetCards preset={plan.state.preset} onPick={plan.applyPreset} />
         </div>
