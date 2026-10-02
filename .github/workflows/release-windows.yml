@@ -19,12 +19,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
         with:
           toolchain: stable
-      - name: Build release binary
-        run: cargo build --release -p dw4vhp-gui
-      - name: Smoke-check --version
-        shell: pwsh
-        run: .\target\release\dw4-veryhard-plus.exe --version
-
+      - uses: actions/setup-node@v4
+      - name: Build the frontend and the Tauri app (MSI via the bundler)
+        run: |
+          npm ci
+          npx tauri build --bundles msi
       - name: Package Windows (zip)
         shell: pwsh
         env:
@@ -36,22 +35,17 @@ jobs:
             -DestinationPath $zip
           Get-Item $zip | Select-Object -ExpandProperty FullName
 
-      - name: Package Windows (MSI)
+      - name: Package Windows (MSI name)
         shell: pwsh
         env:
           ASSET_VERSION: ${{ github.ref_name }}
         run: |
           $version = $env:ASSET_VERSION.TrimStart("v")
-          dotnet tool install --global wix
-          # WiX v7 requires accepting the OSMF EULA (WIX7015 otherwise).
-          wix build `
-            -acceptEula wix7 `
-            -arch x64 `
-            -d BinDir=target\release `
-            -d Icon=crates\dw4vhp-gui\icons\icon.ico `
-            -d Version=$version `
-            -out "dw4-veryhard-plus-$version-windows-x86_64.msi" `
-            crates\dw4vhp-gui\packaging\msi.wxs
+          # The bundler's MSI (WiX, UpgradeCode pinned in tauri.conf.json)
+          # lands in target\release\bundle\msi.
+          $msi =
+            "target\release\bundle\msi\dw4-veryhard-plus-$version-windows-x86_64.msi"
+          Copy-Item $msi -Destination .
           Get-Item *.msi | Select-Object -ExpandProperty FullName
 
       - name: Upload Windows assets

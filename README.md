@@ -90,7 +90,7 @@ The rest of the details live here:
   ```
 
 - The code has two parts: `dw4vhp-core` (the engine that actually edits the disc, fully
-  testable on its own) and `dw4vhp-gui` (the window you see).
+  testable on its own) and `dw4vhp-tauri` (the window you see: a Tauri shell plus the React app in `src/`).
 - **Testing against real discs:** the "golden test" proves the app reproduces known,
   shipped discs byte-for-byte. It needs real disc images supplied through environment
   variables (`DW4_GOLDEN_SHIPPED_ISO`, `DW4_GOLDEN_BLOCKS_BIN`, `DW4_GOLDEN_BLOCKS_JSON`)

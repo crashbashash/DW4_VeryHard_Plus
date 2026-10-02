@@ -3,6 +3,7 @@
   "productName": "DW4 Very Hard Plus",
   "version": "0.1.0",
   "identifier": "io.github.crashbashash.dw4-veryhard-plus",
+  "mainBinaryName": "dw4-veryhard-plus",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
