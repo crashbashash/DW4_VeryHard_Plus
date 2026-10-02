@@ -147,7 +147,9 @@ jobs:
         run: |
           $version = $env:ASSET_VERSION.TrimStart("v")
           dotnet tool install --global wix
+          # WiX v7 requires accepting the OSMF EULA (WIX7015 otherwise).
           wix build `
+            -acceptEula wix7 `
             -arch x64 `
             -d BinDir=target\release `
             -d Icon=crates\dw4vhp-gui\icons\icon.ico `
