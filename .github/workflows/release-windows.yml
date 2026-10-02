@@ -1,0 +1,88 @@
+name: Release Windows
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Windows (zip, MSI)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      # dtolnay/rust-toolchain @ stable
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: stable
+      - name: Build release binary
+        run: cargo build --release -p dw4vhp-gui
+      - name: Smoke-check --version
+        shell: pwsh
+        run: .\target\release\dw4-veryhard-plus.exe --version
+
+      - name: Package Windows (zip)
+        shell: pwsh
+        env:
+          ASSET_VERSION: ${{ github.ref_name }}
+        run: |
+          $version = $env:ASSET_VERSION
+          $zip = "dw4-veryhard-plus-$version-windows-x86_64.zip"
+          Compress-Archive -Path target\release\dw4-veryhard-plus.exe `
+            -DestinationPath $zip
+          Get-Item $zip | Select-Object -ExpandProperty FullName
+
+      - name: Package Windows (MSI)
+        shell: pwsh
+        env:
+          ASSET_VERSION: ${{ github.ref_name }}
+        run: |
+          $version = $env:ASSET_VERSION.TrimStart("v")
+          dotnet tool install --global wix
+          # WiX v7 requires accepting the OSMF EULA (WIX7015 otherwise).
+          wix build `
+            -acceptEula wix7 `
+            -arch x64 `
+            -d BinDir=target\release `
+            -d Icon=crates\dw4vhp-gui\icons\icon.ico `
+            -d Version=$version `
+            -out "dw4-veryhard-plus-$version-windows-x86_64.msi" `
+            crates\dw4vhp-gui\packaging\msi.wxs
+          Get-Item *.msi | Select-Object -ExpandProperty FullName
+
+      - name: Upload Windows assets
+        # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-assets
+          path: |
+            dw4-veryhard-plus-*.zip
+            dw4-veryhard-plus-*.msi
+          if-no-files-found: error
+
+      - name: Publish Windows assets to release
+        # v2: softprops/action-gh-release
+        uses:
+          softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
+        with:
+          name: DW4 Very Hard Plus ${{ github.ref_name }}
+          tag: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          append_body: true
+          body: |
+            Windows: `dw4-veryhard-plus-${{ github.ref_name
+              }}-windows-x86_64.zip` has the release `.exe`;
+              `…-x86_64.msi` is the same build as an installer (into
+              Program Files, with a Start-menu shortcut). Both are built
+              in CI, but launching either is unverified here — not run in
+              this environment.
+          files: |
+            dw4-veryhard-plus-*-windows-x86_64.zip
+            dw4-veryhard-plus-*-windows-x86_64.msi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

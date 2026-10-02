@@ -1,4 +1,4 @@
-name: Release
+name: Release Linux
 
 on:
   push:
@@ -9,26 +9,17 @@ permissions:
 
 jobs:
   build:
-    name: Build ${{ matrix.label }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - label: Linux (AppImage, deb, tarball)
-            os: ubuntu-22.04
-          - label: Windows (zip, MSI)
-            os: windows-latest
+    name: Build Linux (AppImage, deb, tarball)
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
-      # stable
+      # dtolnay/rust-toolchain @ stable
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
         with:
           toolchain: stable
       - name: Install Linux GUI build dependencies
-        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -40,16 +31,10 @@ jobs:
             libgtk-3-dev
       - name: Build release binary
         run: cargo build --release -p dw4vhp-gui
-      - name: Smoke-check --version (Linux)
-        if: runner.os == 'Linux'
+      - name: Smoke-check --version
         run: ./target/release/dw4-veryhard-plus --version
-      - name: Smoke-check --version (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: .\target\release\dw4-veryhard-plus.exe --version
 
       - name: Package Linux (AppImage, deb, tarball)
-        if: runner.os == 'Linux'
         env:
           ASSET_VERSION: ${{ github.ref_name }}
         run: |
@@ -127,39 +112,7 @@ jobs:
 
           ls -l "${PREFIX}.tar.gz" "${PREFIX}.AppImage" "${PREFIX}.deb"
 
-      - name: Package Windows (zip)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          ASSET_VERSION: ${{ github.ref_name }}
-        run: |
-          $version = $env:ASSET_VERSION
-          $zip = "dw4-veryhard-plus-$version-windows-x86_64.zip"
-          Compress-Archive -Path target\release\dw4-veryhard-plus.exe `
-            -DestinationPath $zip
-          Get-Item $zip | Select-Object -ExpandProperty FullName
-
-      - name: Package Windows (MSI)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          ASSET_VERSION: ${{ github.ref_name }}
-        run: |
-          $version = $env:ASSET_VERSION.TrimStart("v")
-          dotnet tool install --global wix
-          # WiX v7 requires accepting the OSMF EULA (WIX7015 otherwise).
-          wix build `
-            -acceptEula wix7 `
-            -arch x64 `
-            -d BinDir=target\release `
-            -d Icon=crates\dw4vhp-gui\icons\icon.ico `
-            -d Version=$version `
-            -out "dw4-veryhard-plus-$version-windows-x86_64.msi" `
-            crates\dw4vhp-gui\packaging\msi.wxs
-          Get-Item *.msi | Select-Object -ExpandProperty FullName
-
       - name: Upload Linux assets
-        if: runner.os == 'Linux'
         # v4
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -170,53 +123,29 @@ jobs:
             dw4-veryhard-plus-*.deb
           if-no-files-found: error
 
-      - name: Upload Windows assets
-        if: runner.os == 'Windows'
-        # v4
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: windows-assets
-          path: |
-            dw4-veryhard-plus-*.zip
-            dw4-veryhard-plus-*.msi
-          if-no-files-found: error
-
-  release:
-    name: Publish release
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      # v4
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          merge-multiple: true
-          path: assets
-      - name: List assets
-        run: ls -l assets
-      # v2: softprops/action-gh-release
-      - uses:
+      - name: Publish Linux assets to release
+        # v2: softprops/action-gh-release
+        uses:
           softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
-          name: DW4 Very Hard Plus ${{ github.ref_name }}
+          tag: ${{ github.ref_name }}
           draft: false
           prerelease: false
-          files: assets/dw4-veryhard-plus-*
+          append_body: true
           body: |
             DW4 Very Hard Plus ${{ github.ref_name }}.
 
-            Unsigned release assets:
+            Linux: `.AppImage`, `.deb`, and a plain binary tarball
+            (`dw4-veryhard-plus-${{ github.ref_name }}-linux-x86_64.*`).
+            Built in CI; launching them is unverified here — not run in
+            this environment.
 
-            - Windows: `dw4-veryhard-plus-${{ github.ref_name }}-windows-x86_64
-              .zip` has the release `.exe`; `…-x86_64.msi` is the same
-              build as an installer (into Program Files, with a
-              Start-menu shortcut). Both are built in CI, but launching
-              either is unverified here — not run in this environment.
-            - Linux: `.AppImage`, `.deb`, and a plain binary tarball.
-
-            No game data is bundled: every byte the app writes is derived
-            from your own clean Digimon World 4 (USA, `SLUS_208.36`) disc
-            at runtime.
+            No game data is bundled: every byte the app writes is
+            derived from your own clean Digimon World 4 (USA,
+            `SLUS_208.36`) disc at runtime.
+          files: |
+            dw4-veryhard-plus-*-linux-x86_64.tar.gz
+            dw4-veryhard-plus-*-linux-x86_64.AppImage
+            dw4-veryhard-plus-*-linux-x86_64.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
