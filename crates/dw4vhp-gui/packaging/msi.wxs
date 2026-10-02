@@ -2,7 +2,7 @@
 <!--
   The Windows MSI installer: one exe into Program Files, a Start-menu shortcut,
   and the app icon for Add/Remove Programs. Built by the release workflow with
-  WiX v5 (`wix build`), a dotnet tool the runner installs on the fly.
+  WiX (`wix build`), a dotnet tool the runner installs on the fly.
 
   The MSI is built from the same CI exe as the zip — no rebuild, so both assets
   are the same binary. Nothing else ships in the MSI: like the zip, it carries
@@ -29,14 +29,18 @@
     </Feature>
 
     <ComponentGroup Id="AppComponents" Directory="INSTALLFOLDER">
+      <!-- One keypath per component (WIX0230): the exe component keys on
+           the file, the marker component keys on the registry value. -->
       <Component Id="MainExe">
-        <File Id="Dw4Exe" Source="$(BinDir)\dw4-veryhard-plus.exe" />
+        <File Id="Dw4Exe" Source="$(BinDir)\dw4-veryhard-plus.exe" KeyPath="yes" />
         <Shortcut
             Id="StartMenuShortcut"
             Directory="ProgramMenuFolder"
             Name="DW4 Very Hard Plus"
             Icon="ProductIcon"
             IconIndex="0" />
+      </Component>
+      <Component Id="InstalledMarker">
         <RegistryValue
             Root="HKCU"
             Key="Software\DW4VeryHardPlus"
