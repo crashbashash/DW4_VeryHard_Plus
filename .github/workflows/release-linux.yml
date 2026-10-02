@@ -37,7 +37,7 @@ jobs:
         run: |
           npm ci
           npm run build
-          cargo build --release --manifest-path crates/dw4vhp-tauri/Cargo.toml
+          cargo build --release --manifest-path crates/dw4vhp-tauri/Cargo.toml --target-dir target
       - name: Package Linux (AppImage, deb, tarball)
         env:
           ASSET_VERSION: ${{ github.ref_name }}

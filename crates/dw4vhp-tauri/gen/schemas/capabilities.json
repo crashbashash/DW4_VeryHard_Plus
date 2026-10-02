@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"The file open/save dialogs for picking and naming ISOs; the patch logic never touches the network.","local":true,"windows":["main"],"permissions":["core:default","dialog:default"]}}

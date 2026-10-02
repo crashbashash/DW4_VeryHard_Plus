@@ -5,6 +5,10 @@ edition = "2021"
 license = "GPL-3.0-or-later"
 description = "Desktop shell for the Digimon World 4 Very Hard Plus ISO patcher"
 
+[[bin]]
+name = "dw4-veryhard-plus"
+path = "src/main.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

@@ -24,6 +24,9 @@ jobs:
         run: |
           npm ci
           npx tauri build --bundles msi
+        # The Tauri CLI resolves its own target dir next to the excluded
+        # crate: crates\dw4vhp-tauri\target. The packaging steps read from
+        # there (verified locally: the CLI ignores CARGO_TARGET_DIR).
       - name: Package Windows (zip)
         shell: pwsh
         env:
@@ -31,7 +34,7 @@ jobs:
         run: |
           $version = $env:ASSET_VERSION
           $zip = "dw4-veryhard-plus-$version-windows-x86_64.zip"
-          Compress-Archive -Path target\release\dw4-veryhard-plus.exe `
+          Compress-Archive -Path crates\dw4vhp-tauri\target\release\dw4-veryhard-plus.exe `
             -DestinationPath $zip
           Get-Item $zip | Select-Object -ExpandProperty FullName
 
@@ -42,9 +45,9 @@ jobs:
         run: |
           $version = $env:ASSET_VERSION.TrimStart("v")
           # The bundler's MSI (WiX, UpgradeCode pinned in tauri.conf.json)
-          # lands in target\release\bundle\msi under a bundler-chosen name;
+          # lands in the crate's own target dir, under a bundler-chosen name;
           # copy whichever MSI it produced under the asset name.
-          $msi = Get-ChildItem "target\release\bundle\msi" -Filter *.msi |
+          $msi = Get-ChildItem "crates\dw4vhp-tauri\target\release\bundle\msi" -Filter *.msi |
             Select-Object -First 1
           Copy-Item $msi.FullName `
             -Destination "dw4-veryhard-plus-$version-windows-x86_64.msi"
