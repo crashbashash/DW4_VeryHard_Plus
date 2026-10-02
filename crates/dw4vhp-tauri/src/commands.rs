@@ -195,8 +195,11 @@ pub async fn analyze(
     path: String,
     app: AppHandle,
 ) -> Result<DiscStatusPayload, String> {
+    // The path is needed both inside the worker (inspect) and after it (the
+    // input stored for the patch), so the worker gets a clone.
+    let inspect_path = std::path::PathBuf::from(&path);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        inspect(&std::path::PathBuf::from(&path), &Layout::retail())
+        inspect(&inspect_path, &Layout::retail())
     })
     .await
     .map_err(|e| format!("analyze worker failed: {e}"))?;
@@ -204,7 +207,7 @@ pub async fn analyze(
     let payload = verdict(&result);
     if let Ok(report) = result {
         let state = app.state::<AppState>();
-        *state.input.lock().expect("input lock") = Some(std::path::PathBuf::from(path));
+        *state.input.lock().expect("input lock") = Some(std::path::PathBuf::from(&path));
         *state.report.lock().expect("report lock") = Some(report);
     }
     Ok(payload)
