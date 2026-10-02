@@ -1,0 +1,38 @@
+{
+  "name": "dw4-veryhard-plus",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
+    "react": "^19.3.0",
+    "react-aria-components": "^1.21.1",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9",
+    "@tauri-apps/cli": "^2.11.4",
+    "@testing-library/react": "^16",
+    "@testing-library/user-event": "^14",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6",
+    "eslint": "^9",
+    "eslint-plugin-react-hooks": "^7",
+    "globals": "^16",
+    "jsdom": "^30",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8",
+    "vite": "^8",
+    "vitest": "^5"
+  }
+}

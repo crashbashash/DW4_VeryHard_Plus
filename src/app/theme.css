@@ -1,0 +1,61 @@
+/* Theme: CSS variables for light and dark, following the OS via
+   prefers-color-scheme, as DW4orge does. No manual toggle. */
+
+:root {
+  --bg: #f6f6f4;
+  --fg: #22221f;
+  --panel: #ffffff;
+  --border: #d8d6d0;
+  --accent: #b8860b;
+  --accent-fg: #ffffff;
+  --danger: #b03030;
+  --ok: #1f7a34;
+  --muted: #6b6b66;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1c1a;
+    --fg: #e8e8e4;
+    --panel: #262624;
+    --border: #3c3c38;
+    --accent: #d4a017;
+    --accent-fg: #111110;
+    --danger: #e06060;
+    --ok: #5fbf7a;
+    --muted: #9a9a94;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+h1 {
+  font-size: clamp(1.2rem, 1rem + 1vw, 1.6rem);
+  margin: 0;
+}
+
+.app-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.app-subtitle {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}

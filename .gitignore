@@ -12,3 +12,7 @@
 # The patcher streams its copy to `<output>.part`, which is a full/partial ISO
 # copy and therefore game data too.
 *.part
+node_modules
+.superpowers/
+node_modules
+.vitest/
