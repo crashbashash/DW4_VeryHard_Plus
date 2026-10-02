@@ -5,7 +5,8 @@ on:
     tags: ['v*']
 
 permissions:
-  contents: read
+  # Creating the release and uploading the built assets needs write access.
+  contents: write
 
 jobs:
   build:
@@ -69,7 +70,7 @@ jobs:
           softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
           name: DW4 Very Hard Plus ${{ github.ref_name }}
-          tag: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
           draft: false
           prerelease: false
           append_body: true
