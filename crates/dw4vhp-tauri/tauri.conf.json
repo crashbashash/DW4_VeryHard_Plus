@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DW4 Very Hard Plus",
+  "version": "0.1.0",
+  "identifier": "io.github.crashbashash.dw4-veryhard-plus",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "DW4 Very Hard Plus",
+        "width": 1000,
+        "height": 720,
+        "minWidth": 560,
+        "minHeight": 480,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "category": "RolePlayingGame",
+    "shortDescription": "Makes your Digimon World 4 disc much harder",
+    "longDescription": "Reads the player's own clean Digimon World 4 (USA) disc and writes a new, harder copy: boosted enemies, the yellow crown, presets or fully custom settings.",
+    "publisher": "DW4 Very Hard Plus contributors",
+    "license": "GPL-3.0-or-later",
+    "windows": {
+      "wix": {
+        "upgradeCode": "bd9d3915-b839-48c7-ae79-afbf60a6cd78"
+      }
+    }
+  }
+}
