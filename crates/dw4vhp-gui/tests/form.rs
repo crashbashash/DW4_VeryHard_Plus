@@ -1,6 +1,7 @@
 // crates/dw4vhp-gui/tests/form.rs
 use dw4vhp_core::error::Error;
 use dw4vhp_core::plan::{PlanSummary, Preset};
+use dw4vhp_core::serial::DEFAULT_SERIAL;
 use dw4vhp_gui::form::{
     attack_pin_note, collapse_note, default_output_path, status_for, StatusKind, UiState,
 };
@@ -24,6 +25,29 @@ fn editing_any_knob_switches_the_preset_to_custom() {
     s.plan.crown_rank = 3;
     s.on_plan_edited();
     assert_eq!(s.preset, Preset::Custom);
+}
+
+#[test]
+fn selecting_a_preset_loads_its_plan_into_the_advanced_panel() {
+    let mut s = UiState::default();
+    // Start somewhere far from any preset.
+    s.plan.crown_rank = 0;
+    s.plan.collapse_to_top = true;
+    s.on_plan_edited();
+    assert_eq!(s.preset, Preset::Custom);
+
+    let mut serial_enabled = true;
+    let mut serial_text = "SLUS_999.99".to_string();
+    s.apply_preset(Preset::Brutal, &mut serial_enabled, &mut serial_text);
+    assert_eq!(s.plan, Preset::Brutal.plan());
+    assert_eq!(s.preset, Preset::Brutal);
+    assert!(!serial_enabled);
+    assert_eq!(serial_text, DEFAULT_SERIAL.to_string());
+
+    // Custom keeps whatever plan is on screen — it has none of its own.
+    let kept = s.plan.clone();
+    s.apply_preset(Preset::Custom, &mut serial_enabled, &mut serial_text);
+    assert_eq!(s.plan, kept);
 }
 
 #[test]

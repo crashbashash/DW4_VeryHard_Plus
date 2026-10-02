@@ -45,6 +45,17 @@ const CAVEAT_MOD_OPEN_ITEMS: &str =
      `e_mecha4` row 60; about 16 variant models have no row of their own; the 88-record \
      `beNDMWStatusInfo` table has never been explored; and the two-player graduation tripwire has \
      never been triggered.";
+/// The crown colours the game's `SETRAREICON` draws for `RARITY` 0–5, as
+/// verified live in the decomp (0 and 6 both draw nothing).
+const CROWN_COLOURS: [(u8, &str); 6] = [
+    (0, "none (no crown)"),
+    (1, "green"),
+    (2, "blue"),
+    (3, "pink"),
+    (4, "white"),
+    (5, "yellow"),
+];
+
 const CAVEAT_BRUTAL: &str =
     "The Brutal preset's enemy grouping comes from a memory snapshot taken while the game was \
      running, not from the disc — the disc does not record which rows belong to which enemy type. \
@@ -313,11 +324,13 @@ impl App {
                 }
             });
         if preset != self.state.preset {
-            self.state.preset = preset;
+            self.state
+                .apply_preset(preset, &mut self.serial_enabled, &mut self.serial_text);
             if preset != Preset::Custom {
-                self.state.plan = preset.plan();
-                self.serial_enabled = false;
-                self.serial_text = DEFAULT_SERIAL.to_string();
+                self.log.push(format!(
+                    "preset set to {} — Advanced now shows its settings",
+                    preset.label()
+                ));
                 self.refresh_summary();
             }
         }
@@ -325,7 +338,7 @@ impl App {
 
     fn advanced_panel(&mut self, ui: &mut egui::Ui) {
         egui::CollapsingHeader::new("Advanced")
-            .default_open(false)
+            .default_open(true)
             .show(ui, |ui| {
                 let mut plan_edited = false;
                 egui::Grid::new("advanced_multipliers")
@@ -344,10 +357,19 @@ impl App {
                     });
 
                 ui.horizontal(|ui| {
-                    ui.label("crown rank");
-                    plan_edited |= ui
-                        .add(egui::DragValue::new(&mut self.state.plan.crown_rank).range(0..=5))
-                        .changed();
+                    ui.label("crown colour");
+                    let mut rank = self.state.plan.crown_rank;
+                    egui::ComboBox::from_id_salt("crown_colour")
+                        .selected_text(crown_colour_name(rank))
+                        .show_ui(ui, |ui| {
+                            for &(value, name) in &CROWN_COLOURS {
+                                ui.selectable_value(&mut rank, value, name);
+                            }
+                        });
+                    if rank != self.state.plan.crown_rank {
+                        self.state.plan.crown_rank = rank;
+                        plan_edited = true;
+                    }
                 });
 
                 plan_edited |= ui
@@ -358,6 +380,12 @@ impl App {
                     .changed();
                 plan_edited |= ui
                     .checkbox(&mut self.state.plan.exclude_tripwire, "exclude tripwire")
+                    .changed();
+                plan_edited |= ui
+                    .checkbox(
+                        &mut self.state.plan.exclude_practice,
+                        "leave training-stage enemies vanilla",
+                    )
                     .changed();
                 plan_edited |= ui
                     .checkbox(&mut self.state.plan.practice_buff, "practice buff")
@@ -383,6 +411,10 @@ impl App {
                     self.state.on_plan_edited();
                     self.refresh_summary();
                 }
+                ui.label(
+                    "these settings follow the selected preset until you edit one — then the \
+                     preset becomes Custom",
+                );
             });
     }
 
@@ -520,6 +552,15 @@ fn spawn_inspect(input: PathBuf) -> AnalyzeHandle {
         let _ = tx.send(result);
     });
     AnalyzeHandle { rx, handle }
+}
+
+/// One labelled multiplier row inside the Advanced grid.
+fn crown_colour_name(rank: u8) -> &'static str {
+    CROWN_COLOURS
+        .iter()
+        .find(|&&(value, _)| value == rank)
+        .map(|&(_, name)| name)
+        .unwrap_or("unknown")
 }
 
 /// One labelled multiplier row inside the Advanced grid.

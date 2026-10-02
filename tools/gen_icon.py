@@ -10,8 +10,9 @@ it is artwork, not game data). This script reads it and writes the single icon
     crates/dw4vhp-gui/icons/icon.png   256x256 RGBA
 
 ``eframe``'s ``IconData`` takes exactly one image, and 256x256 is the size its
-own docs recommend, so no other sizes are generated. Run it by hand only when
-the artwork changes, then commit both PNGs:
+own docs recommend, so no other PNG sizes are generated. The script also writes
+``icon.ico`` (16–256 px, for the Windows MSI) from the same source. Run it by
+hand only when the artwork changes, then commit the icon files:
 
     python3 tools/gen_icon.py
 
@@ -31,6 +32,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ICONS = ROOT / "crates" / "dw4vhp-gui" / "icons"
 SOURCE = ICONS / "source.png"
 ICON = ICONS / "icon.png"
+ICO = ICONS / "icon.ico"
 
 # The committed source artwork is square and at least this large.
 SOURCE_SIZE = 1024
@@ -69,7 +71,7 @@ def draw_source() -> Image.Image:
         [margin, margin, size - margin, size - margin], radius=radius, fill=255
     )
 
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    img = Image.new("RGBA", (size, size), 0)
     img.paste(gradient, (0, 0), mask)
     draw = ImageDraw.Draw(img)
 
@@ -100,7 +102,7 @@ def draw_source() -> Image.Image:
     for bar in (vertical, horizontal):
         draw.line(bar + [bar[0]], fill=GOLD_EDGE, width=6 * SUPERSAMPLE, joint="curve")
 
-    return img.resize((SOURCE_SIZE, SOURCE_SIZE), Image.LANCZOS)
+    return img.resize((SOURCE_SIZE, SOURCE_SIZE), Image.Resampling.LANCZOS)
 
 
 def main() -> int:
@@ -119,9 +121,16 @@ def main() -> int:
         )
         return 1
 
-    icon = source.resize((ICON_SIZE, ICON_SIZE), Image.LANCZOS)
+    icon = source.resize((ICON_SIZE, ICON_SIZE), Image.Resampling.LANCZOS)
     icon.save(ICON)
     print(f"wrote {ICON.relative_to(ROOT)} ({ICON_SIZE}x{ICON_SIZE})")
+
+    # The Windows MSI embeds a multi-size .ico, so Explorer can pick the size
+    # each surface wants (Start menu, taskbar, file associations). Sizes and
+    # order are fixed so the file is reproducible.
+    sizes = (16, 24, 32, 48, 64, 128, 256)
+    source.save(ICO, format="ICO", sizes=[(s, s) for s in sizes])
+    print(f"wrote {ICO.relative_to(ROOT)} ({sizes[0]}–{sizes[-1]} px)")
     print(f"source: {SOURCE.relative_to(ROOT)} ({source.width}x{source.height})")
     return 0
 

@@ -17,16 +17,16 @@ jobs:
         include:
           - label: Linux (AppImage, deb, tarball)
             os: ubuntu-22.04
-          - label: Windows (zip)
+          - label: Windows (zip, MSI)
             os: windows-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      # stable
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Install Linux GUI build dependencies
         if: runner.os == 'Linux'
         run: |
@@ -70,9 +70,11 @@ jobs:
             "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
           install -m 755 "${BIN}" "${APPDIR}/usr/bin/dw4-veryhard-plus"
           ln -s usr/bin/dw4-veryhard-plus "${APPDIR}/AppRun"
-          cp crates/dw4vhp-gui/icons/icon.png \
-            "${APPDIR}/usr/share/icons/hicolor/256x256/apps/dw4-veryhard-plus.png"
-          cp crates/dw4vhp-gui/icons/icon.png "${APPDIR}/dw4-veryhard-plus.png"
+          IC="crates/dw4vhp-gui/icons/icon.png"
+          APPSHARE="${APPDIR}/usr/share/icons/hicolor/256x256/apps"
+          cp "$IC" "$APPSHARE/"
+          mv "$APPSHARE/icon.png" "$APPSHARE/dw4-veryhard-plus.png"
+          cp "$IC" "${APPDIR}/dw4-veryhard-plus.png"
           cat > "${APPDIR}/dw4-veryhard-plus.desktop" <<'EOF'
           [Desktop Entry]
           Type=Application
@@ -86,14 +88,17 @@ jobs:
           cp "${APPDIR}/dw4-veryhard-plus.desktop" \
             "${APPDIR}/usr/share/applications/dw4-veryhard-plus.desktop"
 
+          APPIMAGETOOL_URL=https://github.com/AppImage/appimagetool
+          APPIMAGETOOL_URL="$APPIMAGETOOL_URL/releases/download/continuous"
           curl -fL -o "${STAGE}/appimagetool" \
-            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+            "$APPIMAGETOOL_URL/appimagetool-x86_64.AppImage"
           chmod +x "${STAGE}/appimagetool"
           # APPIMAGE_EXTRACT_AND_RUN avoids the CI/libfuse2 dependency.
           APPIMAGE_EXTRACT_AND_RUN=1 "${STAGE}/appimagetool" \
             "${APPDIR}" "${PREFIX}.AppImage"
 
           # --- deb ---
+          MAINT="crashbashash <109347317+crashbashash@users.noreply.github.com>"
           PKGROOT="${STAGE}/pkg"
           mkdir -p \
             "${PKGROOT}/DEBIAN" \
@@ -102,16 +107,18 @@ jobs:
             "${PKGROOT}/usr/share/icons/hicolor/256x256/apps"
           install -m 755 "${BIN}" "${PKGROOT}/usr/bin/dw4-veryhard-plus"
           cp "${APPDIR}/dw4-veryhard-plus.desktop" \
-            "${PKGROOT}/usr/share/applications/dw4-veryhard-plus.desktop"
-          cp crates/dw4vhp-gui/icons/icon.png \
-            "${PKGROOT}/usr/share/icons/hicolor/256x256/apps/dw4-veryhard-plus.png"
+            "${PKGROOT}/usr/share/applications/"
+          PKGSHARE="${PKGROOT}/usr/share/icons/hicolor/256x256/apps"
+          cp "$IC" "$PKGSHARE/"
+          mv "$PKGSHARE/icon.png" "$PKGSHARE/dw4-veryhard-plus.png"
+
           cat > "${PKGROOT}/DEBIAN/control" <<EOF
           Package: dw4-veryhard-plus
           Version: ${DEB_VERSION}
           Section: games
           Priority: optional
           Architecture: amd64
-          Maintainer: crashbashash <109347317+crashbashash@users.noreply.github.com>
+          Maintainer: ${MAINT}
           Description: Patch a Digimon World 4 (USA) ISO to Very Hard Plus
            A desktop app that turns a player's own clean Digimon World 4
            (USA, SLUS_208.36) disc into a much harder one.
@@ -123,15 +130,36 @@ jobs:
       - name: Package Windows (zip)
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          ASSET_VERSION: ${{ github.ref_name }}
         run: |
-          $version = "${{ github.ref_name }}"
+          $version = $env:ASSET_VERSION
           $zip = "dw4-veryhard-plus-$version-windows-x86_64.zip"
-          Compress-Archive -Path target\release\dw4-veryhard-plus.exe -DestinationPath $zip
+          Compress-Archive -Path target\release\dw4-veryhard-plus.exe `
+            -DestinationPath $zip
           Get-Item $zip | Select-Object -ExpandProperty FullName
+
+      - name: Package Windows (MSI)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          ASSET_VERSION: ${{ github.ref_name }}
+        run: |
+          $version = $env:ASSET_VERSION.TrimStart("v")
+          dotnet tool install --global wix
+          wix build `
+            -arch x64 `
+            -d BinDir=target\release `
+            -d Icon=crates\dw4vhp-gui\icons\icon.ico `
+            -d Version=$version `
+            -out "dw4-veryhard-plus-$version-windows-x86_64.msi" `
+            crates\dw4vhp-gui\packaging\msi.wxs
+          Get-Item *.msi | Select-Object -ExpandProperty FullName
 
       - name: Upload Linux assets
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: linux-assets
           path: |
@@ -142,10 +170,13 @@ jobs:
 
       - name: Upload Windows assets
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: windows-assets
-          path: dw4-veryhard-plus-*.zip
+          path: |
+            dw4-veryhard-plus-*.zip
+            dw4-veryhard-plus-*.msi
           if-no-files-found: error
 
   release:
@@ -155,13 +186,16 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           merge-multiple: true
           path: assets
       - name: List assets
         run: ls -l assets
-      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+      # v2: softprops/action-gh-release
+      - uses:
+          softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
           name: DW4 Very Hard Plus ${{ github.ref_name }}
           draft: false
@@ -172,12 +206,15 @@ jobs:
 
             Unsigned release assets:
 
-            - Windows: `dw4-veryhard-plus-${{ github.ref_name }}-windows-x86_64.zip`
-              contains the release `.exe`. It is built in CI, but launching it is
-              unverified in this environment — it has not been run here.
+            - Windows: `dw4-veryhard-plus-${{ github.ref_name }}-windows-x86_64
+              .zip` has the release `.exe`; `…-x86_64.msi` is the same
+              build as an installer (into Program Files, with a
+              Start-menu shortcut). Both are built in CI, but launching
+              either is unverified here — not run in this environment.
             - Linux: `.AppImage`, `.deb`, and a plain binary tarball.
 
-            No game data is bundled: every byte the app writes is derived from your
-            own clean Digimon World 4 (USA, `SLUS_208.36`) disc at runtime.
+            No game data is bundled: every byte the app writes is derived
+            from your own clean Digimon World 4 (USA, `SLUS_208.36`) disc
+            at runtime.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

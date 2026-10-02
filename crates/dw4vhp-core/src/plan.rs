@@ -10,6 +10,11 @@ pub const DESTRUCTIBLE_ROWS: std::ops::RangeInclusive<usize> = 370..=378;
 /// a base-stat Kokatorimon proves which row a spawn took (spec §3.4).
 pub const TRIPWIRE_ROWS: [usize; 2] = [644, 645];
 
+/// The practice stage's lesson rows: when [`PatchPlan::exclude_practice`] is
+/// set these are left byte-identical, so the training enemies stay exactly as
+/// the vanilla game ships them (spec §3.6).
+pub const PRACTICE_ROWS: std::ops::RangeInclusive<usize> = 638..=643;
+
 /// Practice-stage overrides, `(destination, source)`: the tutorial rows
 /// 638–643 are authored as token values, so each is replaced by an ordinary
 /// tier-0 row of the same type. Sources are read from the *computed* table
@@ -44,6 +49,12 @@ pub struct PatchPlan {
     pub crown_rank: u8,
     pub exclude_destructibles: bool,
     pub exclude_tripwire: bool,
+    /// Leaves the practice stage's lesson rows ([`PRACTICE_ROWS`]) byte-
+    /// identical, so the training enemies are the vanilla ones. The Extreme
+    /// and Brutal presets turn this on: a training-stage enemy carrying the
+    /// buff (or, under Brutal, a collapsed top row) is unscratchable with
+    /// starting gear. When set, the practice buff never fires.
+    pub exclude_practice: bool,
     pub practice_buff: bool,
     pub collapse_to_top: bool,
     pub force_very_hard: bool,
@@ -62,6 +73,7 @@ impl Default for PatchPlan {
             crown_rank: 5,
             exclude_destructibles: true,
             exclude_tripwire: true,
+            exclude_practice: false,
             practice_buff: true,
             collapse_to_top: false,
             force_very_hard: false,
@@ -87,11 +99,17 @@ impl Preset {
     /// edited plan — so it yields the default plan as an editing baseline.
     pub fn plan(self) -> PatchPlan {
         match self {
+            // Both leave the training-stage lesson rows exactly as authored:
+            // the practice buff (and, under Brutal, the collapse feeding it)
+            // otherwise equips the tutorial enemies with stats a starting
+            // character cannot damage.
             Preset::Extreme => PatchPlan {
+                exclude_practice: true,
                 force_very_hard: true,
                 ..PatchPlan::default()
             },
             Preset::Brutal => PatchPlan {
+                exclude_practice: true,
                 collapse_to_top: true,
                 force_very_hard: true,
                 ..PatchPlan::default()
@@ -145,6 +163,7 @@ pub struct PlanSummary {
 fn is_excluded(r: usize, plan: &PatchPlan) -> bool {
     (plan.exclude_destructibles && DESTRUCTIBLE_ROWS.contains(&r))
         || (plan.exclude_tripwire && TRIPWIRE_ROWS.contains(&r))
+        || (plan.exclude_practice && PRACTICE_ROWS.contains(&r))
 }
 
 /// Applies `plan` and `ratio` to `authored`, returning the table that gets
@@ -227,6 +246,11 @@ pub fn transform(
 
     if plan.practice_buff {
         for &(dest, src) in &PRACTICE_MAP {
+            // `exclude_practice` wins: a vanilla training stage and the buff
+            // contradict each other, and the exclusion is the safer read.
+            if is_excluded(dest, plan) {
+                continue;
+            }
             out.hp[dest] = out.hp[src];
             out.stat[dest] = out.stat[src];
             out.crit[dest] = out.crit[src];

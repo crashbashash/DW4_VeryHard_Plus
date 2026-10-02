@@ -178,17 +178,20 @@ Tagged releases (`v*`) are built and published by
 | Asset | Contents |
 | --- | --- |
 | `dw4-veryhard-plus-<tag>-windows-x86_64.zip` | the release `.exe` |
+| `dw4-veryhard-plus-<tag>-windows-x86_64.msi` | the same build as an installer (Program Files + Start-menu shortcut, built with WiX from `crates/dw4vhp-gui/packaging/msi.wxs`) |
 | `dw4-veryhard-plus-<tag>-linux-x86_64.AppImage` | the app in one file |
 | `dw4-veryhard-plus-<tag>-linux-x86_64.deb` | the app installed to `/usr/bin` with a desktop entry and icon |
 | `dw4-veryhard-plus-<tag>-linux-x86_64.tar.gz` | the plain binary |
 
 The Linux bundles are built and launch-verified here (the AppImage is run
-headlessly under Xvfb). The Windows zip is built in CI, but launching the `.exe`
-is unverified in this environment — it has not been run here.
+headlessly under Xvfb). The Windows zip and MSI are built in CI, but launching
+the `.exe` / running the `.msi` is unverified in this environment — they have
+not been run here. Like every release asset, both are unsigned.
 
 The app icon is generated from committed artwork at
 `crates/dw4vhp-gui/icons/source.png` by `tools/gen_icon.py`, which writes
-`crates/dw4vhp-gui/icons/icon.png` (256²) — the single image the window embeds.
+`crates/dw4vhp-gui/icons/icon.png` (256²) — the single image the window embeds —
+and `icon.ico` (16–256 px), which the Windows MSI embeds.
 
 ## Licence
 

@@ -9,6 +9,7 @@
 use dw4vhp_core::disc::DiscReport;
 use dw4vhp_core::error::{Error, Result};
 use dw4vhp_core::plan::{PatchPlan, PlanSummary, Preset};
+use dw4vhp_core::serial::DEFAULT_SERIAL;
 use std::path::{Path, PathBuf};
 
 /// The disc this patcher supports, named as the refusals name it.
@@ -51,6 +52,24 @@ impl UiState {
     /// knob reports `Custom` instead of a named build the plan no longer is.
     pub fn on_plan_edited(&mut self) {
         self.preset = Preset::detect(&self.plan);
+    }
+
+    /// Selecting a preset loads that preset's whole plan, so the Advanced
+    /// panel always shows the values the selected build will write. Selecting
+    /// `Custom` keeps the current plan — it has no canonical values to load.
+    /// A preset never carries a serial edit, so the serial controls reset too.
+    pub fn apply_preset(
+        &mut self,
+        preset: Preset,
+        serial_enabled: &mut bool,
+        serial_text: &mut String,
+    ) {
+        self.preset = preset;
+        if preset != Preset::Custom {
+            self.plan = preset.plan();
+            *serial_enabled = false;
+            *serial_text = DEFAULT_SERIAL.to_string();
+        }
     }
 }
 

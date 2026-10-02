@@ -14,7 +14,7 @@
 
 use dw4vhp_core::layout::Layout;
 use dw4vhp_core::patch::{patch_file, PatchOptions};
-use dw4vhp_core::plan::{PatchPlan, Preset, DESTRUCTIBLE_ROWS, TRIPWIRE_ROWS};
+use dw4vhp_core::plan::{PatchPlan, Preset, DESTRUCTIBLE_ROWS, PRACTICE_ROWS, TRIPWIRE_ROWS};
 use dw4vhp_core::rowgroup::ROW_GROUPS;
 use dw4vhp_core::serial::DEFAULT_SERIAL;
 use dw4vhp_core::table::EnemyTable;
@@ -279,8 +279,8 @@ fn golden_chain_reproduces_the_shipped_builds() {
     );
 
     // Step 6: the Brutal preset collapses every type onto its top row, leaves
-    // the destructibles and the 644/645 tripwire exactly as authored, and still
-    // carries the force-Very-Hard ELF word.
+    // the destructibles, the 644/645 tripwire and the training-stage lesson
+    // rows exactly as authored, and still carries the force-Very-Hard ELF word.
     let brutal = tmp.path().join("brutal.iso");
     patch_file(
         &pristine,
@@ -302,7 +302,7 @@ fn golden_chain_reproduces_the_shipped_builds() {
             continue;
         }
         for &row in group.rows {
-            if row == group.top || TRIPWIRE_ROWS.contains(&row) {
+            if row == group.top || TRIPWIRE_ROWS.contains(&row) || PRACTICE_ROWS.contains(&row) {
                 continue;
             }
             assert_eq!(
@@ -323,7 +323,7 @@ fn golden_chain_reproduces_the_shipped_builds() {
         }
     }
 
-    for row in DESTRUCTIBLE_ROWS.chain(TRIPWIRE_ROWS) {
+    for row in DESTRUCTIBLE_ROWS.chain(TRIPWIRE_ROWS).chain(PRACTICE_ROWS) {
         assert_eq!(
             (
                 collapsed.hp[row],
