@@ -5,7 +5,7 @@
   "identifier": "io.github.crashbashash.dw4-veryhard-plus",
   "mainBinaryName": "dw4-veryhard-plus",
   "build": {
-    "frontendDist": "../dist",
+    "frontendDist": "../../dist",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build"
