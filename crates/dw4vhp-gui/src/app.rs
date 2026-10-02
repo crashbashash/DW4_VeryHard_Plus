@@ -1,6 +1,7 @@
 //! The `eframe` window: one screen that picks a disc, shows what it detected,
 //! lets the player choose a preset or edit the plan, and patches on a
-//! background worker so a 1.4 GB copy never blocks the UI thread.
+//! background worker so a 1.4 GB copy never blocks the UI thread. Analysing
+//! happens automatically when a disc is chosen; the one button is Patch ISO.
 //!
 //! Nothing in this module calls the engine on the UI thread. Analyze runs
 //! [`inspect`] on its own worker and Patch runs [`spawn_patch`]; the only
@@ -28,23 +29,6 @@ use std::thread::JoinHandle;
 const STAT_NAMES: [&str; 12] = [
     "atk", "def", "wis", "spr", "spd", "fire", "ice", "thunder", "dark", "stun", "poison", "exp",
 ];
-
-const CAVEAT_FORCE_VERY_HARD: &str =
-    "Force Very Hard (used by the Extreme preset) has never been played. It is a single \
-     instruction — the same change the original mod makes — and tests confirm it rewrites exactly \
-     four bytes in the game's boot file and touches nothing else. What no test can show is the \
-     result: this project was built without an emulator, so \"the game really does start on Very \
-     Hard\" is an expectation, not something anyone has watched happen.";
-const CAVEAT_VERY_HARD_TIER2: &str =
-    "The Very Hard → tier 2 mapping is reasoned, not measured. Normal → tier 0 and Hard → tier 1 \
-     were confirmed live in-game, on the valley bridge. The table is laid out as 3 tiers with 3–4 \
-     variants each, and Very Hard's tier 2 slot follows from that layout — but it was never checked \
-     the same way, so the Extreme preset's effect size is documented as inferred.";
-const CAVEAT_MOD_OPEN_ITEMS: &str =
-    "The original mod's own untested items still apply here: every boss row is unmeasured except \
-     `e_mecha4` row 60; about 16 variant models have no row of their own; the 88-record \
-     `beNDMWStatusInfo` table has never been explored; and the two-player graduation tripwire has \
-     never been triggered.";
 /// The crown colours the game's `SETRAREICON` draws for `RARITY` 0–5, as
 /// verified live in the decomp (0 and 6 both draw nothing).
 const CROWN_COLOURS: [(u8, &str); 6] = [
@@ -55,12 +39,6 @@ const CROWN_COLOURS: [(u8, &str); 6] = [
     (4, "white"),
     (5, "yellow"),
 ];
-
-const CAVEAT_BRUTAL: &str =
-    "The Brutal preset's enemy grouping comes from a memory snapshot taken while the game was \
-     running, not from the disc — the disc does not record which rows belong to which enemy type. \
-     Every enemy of a type is therefore made identical to that type's strongest row. Nobody has \
-     played this preset: with no emulator here, the in-game result is unconfirmed.";
 
 /// The window's whole state between frames.
 pub struct App {
@@ -108,6 +86,8 @@ impl App {
         self.report = None;
         self.summary = None;
         self.log.push(format!("chose disc {}", path.display()));
+        // Analysing is automatic: picking a disc is all it takes.
+        self.start_analyze();
     }
 
     fn start_analyze(&mut self) {
@@ -258,7 +238,6 @@ impl App {
         self.actions(ui);
         self.progress_row(ui);
         self.log_panel(ui);
-        about_panel(ui);
     }
 
     fn input_row(&mut self, ui: &mut egui::Ui) {
@@ -277,6 +256,15 @@ impl App {
                 };
                 self.report = None;
                 self.summary = None;
+            }
+            // A path typed by hand does not re-analyse on every keystroke;
+            // once it is committed (focus leaves the field or Enter is
+            // pressed), analysis starts on its own.
+            if (input.lost_focus() || ui.input(|i| i.key_pressed(egui::Key::Enter)))
+                && input.changed()
+                && self.state.input.is_some()
+            {
+                self.start_analyze();
             }
             if input.lost_focus()
                 && self.state.input.is_some()
@@ -338,7 +326,7 @@ impl App {
 
     fn advanced_panel(&mut self, ui: &mut egui::Ui) {
         egui::CollapsingHeader::new("Advanced")
-            .default_open(true)
+            .default_open(false)
             .show(ui, |ui| {
                 let mut plan_edited = false;
                 egui::Grid::new("advanced_multipliers")
@@ -441,16 +429,9 @@ impl App {
 
     fn actions(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            let have_input = self.state.input.is_some();
             let busy = self.worker.is_some() || self.analyze.is_some();
             let have_report = matches!(self.report.as_ref(), Some(Ok(_)));
 
-            if ui
-                .add_enabled(have_input && !busy, egui::Button::new("Analyze"))
-                .clicked()
-            {
-                self.start_analyze();
-            }
             if ui
                 .add_enabled(have_report && !busy, egui::Button::new("Patch ISO"))
                 .clicked()
@@ -578,16 +559,4 @@ fn phase_label(phase: Phase) -> &'static str {
         Phase::Writing => "writing",
         Phase::Verifying => "verifying",
     }
-}
-
-fn about_panel(ui: &mut egui::Ui) {
-    ui.add_space(4.0);
-    egui::CollapsingHeader::new("About")
-        .default_open(false)
-        .show(ui, |ui| {
-            ui.label(CAVEAT_FORCE_VERY_HARD);
-            ui.label(CAVEAT_VERY_HARD_TIER2);
-            ui.label(CAVEAT_MOD_OPEN_ITEMS);
-            ui.label(CAVEAT_BRUTAL);
-        });
 }
