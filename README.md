@@ -69,8 +69,8 @@ plain download). No building required.
 
 The rest of the details live here:
 
-- **Building from source** needs a Rust toolchain. On Linux, install egui's dependencies
-  first:
+- **Building from source** needs a Rust toolchain, Node.js, and — on Linux — the
+  Tauri webview dependencies:
 
   ```sh
   sudo apt-get install -y \
@@ -79,18 +79,23 @@ The rest of the details live here:
     libx11-dev \
     libxi-dev \
     libgl1-mesa-dev \
-    libgtk-3-dev
+    libgtk-3-dev \
+    libwebkit2gtk-4.1-dev \
+    libayatana-appindicator3-dev \
+    librsvg2-dev
   ```
 
   Then:
 
   ```sh
-  cargo build --release
-  ./target/release/dw4-veryhard-plus
+  npm ci
+  npm run dev        # frontend alone (mock backend, in a browser tab)
+  npx tauri dev      # the desktop app, live-reloading
+  npx tauri build    # distributables (exe/AppImage/deb/MSI)
   ```
 
 - The code has two parts: `dw4vhp-core` (the engine that actually edits the disc, fully
-  testable on its own) and `dw4vhp-gui` (the window you see).
+  testable on its own) and `dw4vhp-tauri` (the window you see: a Tauri shell plus the React app in `src/`).
 - **Testing against real discs:** the "golden test" proves the app reproduces known,
   shipped discs byte-for-byte. It needs real disc images supplied through environment
   variables (`DW4_GOLDEN_SHIPPED_ISO`, `DW4_GOLDEN_BLOCKS_BIN`, `DW4_GOLDEN_BLOCKS_JSON`)

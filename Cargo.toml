@@ -1,3 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["crates/dw4vhp-core", "crates/dw4vhp-gui"]
+members = ["crates/dw4vhp-core"]
+# webkit2gtk-4.1 is not available in every build environment, and a member that
+# cannot compile would break the whole workspace gate. CI (or a developer host)
+# builds this crate in a job that installs the system dependencies.
+exclude = ["crates/dw4vhp-tauri"]

@@ -28,12 +28,16 @@ jobs:
             libx11-dev \
             libxi-dev \
             libgl1-mesa-dev \
-            libgtk-3-dev
-      - name: Build release binary
-        run: cargo build --release -p dw4vhp-gui
-      - name: Smoke-check --version
-        run: ./target/release/dw4-veryhard-plus --version
-
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+      - uses: actions/setup-node@v4
+      - name: Build the frontend and the Tauri app
+        run: |
+          npm ci
+          npm run build
+          cargo build --release -p dw4vhp-tauri
       - name: Package Linux (AppImage, deb, tarball)
         env:
           ASSET_VERSION: ${{ github.ref_name }}
@@ -55,7 +59,7 @@ jobs:
             "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
           install -m 755 "${BIN}" "${APPDIR}/usr/bin/dw4-veryhard-plus"
           ln -s usr/bin/dw4-veryhard-plus "${APPDIR}/AppRun"
-          IC="crates/dw4vhp-gui/icons/icon.png"
+          IC="crates/dw4vhp-tauri/icons/icon.png"
           APPSHARE="${APPDIR}/usr/share/icons/hicolor/256x256/apps"
           cp "$IC" "$APPSHARE/"
           mv "$APPSHARE/icon.png" "$APPSHARE/dw4-veryhard-plus.png"
